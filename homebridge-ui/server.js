@@ -7,6 +7,7 @@ import Path from 'path';
 
 import { DysonCloudAuth } from '../dist/dyson-cloud.js';
 import { PLUGIN_NAME } from '../dist/settings.js';
+import { makeAuthConfig } from './auth-config.mjs';
 
 // Authorising a MyDyson account is a two-step flow: `startAuth` asks Dyson to
 // email a one-time code, and `finishAuth` exchanges that code for a long-lived
@@ -73,7 +74,7 @@ class DysonUiServer extends HomebridgePluginUiServer {
         const { lines, log } = this.createLogger();
         try {
             const persist = await this.createPersist();
-            const api = new DysonCloudAuth(log, { provisioningMethod: 'Remote Account' }, persist, account);
+            const api = new DysonCloudAuth(log, makeAuthConfig(), persist, account);
             const started = await api.startAuth();
             return {
                 started,
@@ -84,7 +85,7 @@ class DysonUiServer extends HomebridgePluginUiServer {
                       + ' Use the code from the most recent MyDyson email.'
             };
         } catch (err) {
-            throw new RequestError(`Could not start authorisation: ${err.message}`, { log: lines });
+            throw new RequestError(`Could not start authorisation: ${describeError(err)}`, { log: lines });
         }
     }
 
@@ -98,16 +99,36 @@ class DysonUiServer extends HomebridgePluginUiServer {
         const { lines, log } = this.createLogger();
         try {
             const persist = await this.createPersist();
-            const api = new DysonCloudAuth(log, { provisioningMethod: 'Remote Account' }, persist, account);
+            const api = new DysonCloudAuth(log, makeAuthConfig(), persist, account);
             await api.finishAuth(otpCode.trim());
             return {
                 log: lines,
                 message: 'MyDyson account authorised. Save the configuration and restart Homebridge.'
             };
         } catch (err) {
-            throw new RequestError(`Could not complete authorisation: ${err.message}`, { log: lines });
+            throw new RequestError(`Could not complete authorisation: ${describeError(err)}`, { log: lines });
         }
     }
+}
+
+// Describe an error usefully.
+//
+// A bare `err.message` hides the two things that matter most when this flow
+// fails: a TypeError means the plugin broke before reaching Dyson, and the
+// cause chain carries the HTTP status when Dyson refused.
+function describeError(err) {
+    if (!(err instanceof Error)) return String(err);
+    const parts = [`${err.name}: ${err.message}`];
+    let cause = err.cause;
+    while (cause instanceof Error && parts.length < 4) {
+        parts.push(`caused by ${cause.name}: ${cause.message}`);
+        cause = cause.cause;
+    }
+    if (err instanceof TypeError) {
+        parts.push('(this is a bug in the plugin, not a problem with your account'
+                 + ' — the request never reached Dyson)');
+    }
+    return parts.join(' — ');
 }
 
 // Start the server
