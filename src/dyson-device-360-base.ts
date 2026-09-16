@@ -11,6 +11,7 @@ import { assertIsDefined, formatMilliseconds, formatSeconds, MS, plural, tryList
 import { DysonMqttStatus } from './dyson-mqtt.js';
 import { BasicInformation } from './matter-clusters.js';
 import { ifValueChanged } from './decorator-changed.js';
+import { logError } from './log-error.js';
 import { RvcCleanModeLabels } from './matter-360-modes.js';
 import {
     MatterAccessory360 as Endpoint360,
@@ -383,8 +384,12 @@ export abstract class DysonDevice360Base
             this.unreachableTimer = globalThis.setTimeout(() => {
                 this.log.warn(`Device has not responded for ${formatMilliseconds(this.unreachableGrace)};`
                             + ' reporting its activity as unknown');
-                // Re-run the mapping so the clusters stop reporting stale activity
-                void this.updateClusterAttributes(this.mqtt.status);
+                // Re-run the mapping so the clusters stop reporting stale activity.
+                // Nothing awaits this timer, so it has to contain its own
+                // failures: an unhandled rejection here would take Homebridge
+                // down over a robot that merely stopped answering.
+                this.updateClusterAttributes(this.mqtt.status)
+                    .catch((err: unknown) => { logError(this.log, 'Unreachable timeout', err); });
             }, this.unreachableGrace);
             this.unreachableTimer.unref();
 

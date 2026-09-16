@@ -1,9 +1,6 @@
-ISC License (ISC)
+ISC License
 
-Copyright © 2025-2026 Alexander Thoukydides
-  (matterbridge-dyson-robot, from which this work is derived)
-Copyright © 2026 Oliver Rummeyer
-  (this Homebridge port)
+Copyright © 2025-2026 Alexander Thoukydides, © 2026 Oliver Rummeyer
 
 Permission to use, copy, modify, and/or distribute this software for any
 purpose with or without fee is hereby granted, provided that the above

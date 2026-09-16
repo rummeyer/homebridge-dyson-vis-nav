@@ -155,8 +155,20 @@ export class PlatformDyson implements DynamicPlatformPlugin {
         return whiteList.length === 0 || whiteList.includes(serialNumber);
     }
 
-    // Cleanup resources when Homebridge is shutting down
+    // Cleanup resources when Homebridge is shutting down.
+    //
+    // Nothing awaits this, so it must not reject: an unhandled rejection during
+    // shutdown would be reported as a crash of Homebridge itself.
     async onShutdown(): Promise<void> {
+        try {
+            await this.stopDevices();
+        } catch (err) {
+            logError(this.log, 'Shutting down', err);
+        }
+    }
+
+    // Stop polling the devices
+    private async stopDevices(): Promise<void> {
         this.log.info(`Shutting down ${PLUGIN_NAME}`);
 
         // Stop polling the devices
