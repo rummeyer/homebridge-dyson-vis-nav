@@ -18,12 +18,24 @@ This is a port of [`matterbridge-dyson-robot`](https://github.com/thoukydides/ma
 
 ## Installation
 
+This plugin is not on the npm registry, so the Homebridge UI's plugin search will not find it. Install it from a release tarball instead.
+
 1. Enable Matter in Homebridge (Settings → Matter), then restart Homebridge.
-2. Install the plugin:
+2. On the Homebridge host, install the plugin into the same directory `hb-service` uses for plugins. On a standard `hb-service` install that is `<storage path>/node_modules`, with the storage path usually `/var/lib/homebridge`:
    ```
-   npm install -g homebridge-dyson-vis-nav
+   sudo npm --prefix /var/lib/homebridge install \
+     https://github.com/rummeyer/homebridge-dyson-vis-nav/releases/download/v0.1.0/homebridge-dyson-vis-nav-0.1.0.tgz
+   sudo hb-service restart
    ```
-3. In the plugin settings, enter the email address and password of your MyDyson account.
+   The tarball is prebuilt, so the host needs neither git nor a TypeScript toolchain.
+
+   > `sudo hb-service add homebridge-dyson-vis-nav` does **not** work: it validates its argument as an npm plugin name and rejects URLs and file paths.
+
+   To install from source instead — this needs git and builds on the host:
+   ```
+   sudo npm --prefix /var/lib/homebridge install github:rummeyer/homebridge-dyson-vis-nav
+   ```
+3. Reload the Homebridge UI. The plugin appears under *Plugins*. In its settings, enter the email address and password of your MyDyson account.
 4. Open the **MyDyson Account** tab and click **Request code**. Dyson emails a one-time code.
 5. Enter the code and click **Submit code**.
 6. Save the configuration and restart Homebridge.
