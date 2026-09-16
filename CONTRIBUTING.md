@@ -78,6 +78,13 @@ enumerated attribute as a plain `number`, so nothing more is needed.
 
 ## Taking fixes from upstream
 
+The Dyson protocol layer is carried over from
+[`matterbridge-dyson-robot`](https://github.com/thoukydides/matterbridge-dyson-robot)
+with only its import paths rewritten — see
+[How the code is arranged](#how-the-code-is-arranged) for why those files must
+stay that way. Applying the same rewrites to a newer upstream revision therefore
+reproduces what this plugin should contain, which is what this tool does.
+
 `.upstream.json` records the revision this port is based on, the import rewrites,
 and which files are tracked.
 
@@ -101,11 +108,17 @@ rewrites to the newer revision, and sorts every tracked file into:
 is a deliberate commit:
 
 1. `npm run upstream -- --apply`
-2. Work through anything listed as diverged
+2. Work through anything listed as diverged, using the `git diff` command it
+   prints for each
 3. `npm run build && npm run lint`
-4. Replay the recorded session ([below](#running-without-hardware)) and watch the
-   state transitions
-5. Set `baseline` in `.upstream.json` to the new ref and commit
+4. `npm run check-session` — replays the recorded robot session through the
+   layer you just changed, which is the point of having it
+5. Set `baseline` in `.upstream.json` to the new ref, and commit the lot with a
+   note of which upstream release it came from
+
+Nothing here is automatic on purpose: an upstream change can be a fix, or it can
+be support for a device this plugin does not carry. Read what `--diff` shows
+before taking it.
 
 ### Keeping the rewrites honest
 
