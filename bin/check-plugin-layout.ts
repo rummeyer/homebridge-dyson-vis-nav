@@ -37,6 +37,7 @@ interface LayoutItem {
     key?:           string;
     type?:          string;
     notitle?:       boolean;
+    htmlClass?:     string;
     title?:         string;
     description?:   string;
     items?:         unknown;
@@ -158,16 +159,34 @@ if (existsSync(join(root, indexRel)) && existsSync(join(root, serverRel))) {
 // renders the title and description of the property behind it, which then
 // appear as loose text under the form. Silence both ends.
 {
-    const layoutItems = (schema.layout ?? []) as (string | LayoutItem)[];
+    // Hidden entries live inside a wrapper section, so flatten before checking
+    const flatten = (items: unknown): LayoutItem[] =>
+        (Array.isArray(items) ? items : []).flatMap((item): LayoutItem[] => {
+            if (typeof item !== 'object' || item === null) return [];
+            const entry = item as LayoutItem;
+            return [entry, ...flatten(entry.items)];
+        });
+    const layoutItems = flatten(schema.layout);
+    // Keys inside a section that Bootstrap's d-none hides
+    const hiddenWrapped = new Set<string>(
+        flatten(schema.layout)
+            .filter(item => item.htmlClass?.split(/\s+/).includes('d-none'))
+            .flatMap(section => flatten(section.items))
+            .map(item => item.key)
+            .filter((key): key is string => key !== undefined));
+
     const propertyAt = (path: string): SchemaNode | undefined =>
         path.split('.').reduce<SchemaNode | undefined>(
             (node, part) => node?.properties?.[part], schema.schema);
 
     for (const item of layoutItems) {
-        if (typeof item === 'string' || item.type !== 'hidden' || !item.key) continue;
+        if (item.type !== 'hidden' || !item.key) continue;
         check(item.notitle === true,
-              `config.schema.json: hidden layout entry "${item.key}" needs "notitle": true, `
-            + 'or the form prints its label under the form');
+              `config.schema.json: hidden layout entry "${item.key}" should set "notitle": true`);
+        check(hiddenWrapped.has(item.key),
+              `config.schema.json: hidden layout entry "${item.key}" is not inside a section with `
+            + '"htmlClass": "d-none"; the form derives a label from the key when no title is set, '
+            + 'so it would print one under the form');
         check(!item.title && !item.description,
               `config.schema.json: hidden layout entry "${item.key}" still carries title or description text`);
         const property = propertyAt(item.key);

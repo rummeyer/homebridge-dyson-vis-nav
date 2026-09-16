@@ -203,39 +203,35 @@
             ]
         },
         {
-            "key": "dysonAccount.email",
-            "type": "hidden",
-            "notitle": true,
-            "title": "",
-            "description": ""
-        },
-        {
-            "key": "dysonAccount.password",
-            "type": "hidden",
-            "notitle": true,
-            "title": "",
-            "description": ""
-        },
-        {
-            "key": "dysonAccount.china",
-            "type": "hidden",
-            "notitle": true,
-            "title": "",
-            "description": ""
-        },
-        {
-            "key": "dysonAccount.token",
-            "type": "hidden",
-            "notitle": true,
-            "title": "",
-            "description": ""
-        },
-        {
-            "key": "provisioningMethod",
-            "type": "hidden",
-            "notitle": true,
-            "title": "",
-            "description": ""
+            "type": "section",
+            "htmlClass": "d-none",
+            "items": [
+                {
+                    "key": "dysonAccount.email",
+                    "type": "hidden",
+                    "notitle": true
+                },
+                {
+                    "key": "dysonAccount.password",
+                    "type": "hidden",
+                    "notitle": true
+                },
+                {
+                    "key": "dysonAccount.china",
+                    "type": "hidden",
+                    "notitle": true
+                },
+                {
+                    "key": "dysonAccount.token",
+                    "type": "hidden",
+                    "notitle": true
+                },
+                {
+                    "key": "provisioningMethod",
+                    "type": "hidden",
+                    "notitle": true
+                }
+            ]
         }
     ]
 }
