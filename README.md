@@ -200,50 +200,9 @@ Switch on **Enable debug logging**, reproduce the problem, and [open an issue](h
 
 ## For developers
 
-<details>
-<summary>Running without hardware, and tracking upstream</summary>
-
-### Mock devices
-
-`mqtt-logs/277.jsonl` is a recorded Vis Nav session. Replaying it exercises the whole state machine with no robot and no MyDyson account. It is a development path and deliberately absent from the settings UI, so write it into `config.json` by hand — and note that saving from the UI afterwards drops the `devices` block, since the form does not know it:
-
-```json
-{
-    "platform": "DysonVisNav",
-    "provisioningMethod": "Mock Devices",
-    "devices": [{
-        "name": "Vis Nav Test",
-        "serialNumber": "ABC-EU-TEST0001",
-        "rootTopic": "277",
-        "filename": "/path/to/mqtt-logs/277.jsonl"
-    }]
-}
-```
-
-### Taking fixes from upstream
-
-The Dyson protocol layer comes from
-[`matterbridge-dyson-robot`](https://github.com/thoukydides/matterbridge-dyson-robot)
-with only its import paths rewritten, so upstream fixes apply almost verbatim.
-`.upstream.json` records the revision this port is based on.
-
-```
-npm run upstream                  # what changed since the baseline
-npm run upstream -- --apply       # take the files this port has not touched
-npm run upstream -- --ref v1.12.0
-```
-
-Files still identical to upstream after rewriting are replaced wholesale; files this port has changed are listed with the command to inspect the upstream diff.
-
-### Checks
-
-`npm run build` runs three checks beyond the compiler, covering the parts of a
-Homebridge plugin that no compiler or linter can see: the flags and file layout
-the settings UI requires, that the custom UI's config provides everything the
-Dyson client reads, and that the custom UI's server actually starts. Each was
-written against a bug that had already reached a user.
-
-</details>
+Architecture, how to adopt upstream fixes, the build-time checks, running against
+a recorded session, and the Homebridge settings-UI pitfalls this project ran into
+are all in **[CONTRIBUTING.md](CONTRIBUTING.md)**.
 
 ---
 

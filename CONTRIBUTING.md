@@ -1,0 +1,233 @@
+# Developing homebridge-dyson-vis-nav
+
+Everything a maintainer needs that a user does not. For installing and using the
+plugin, see the [README](README.md).
+
+## Contents
+
+- [How the code is arranged](#how-the-code-is-arranged)
+- [Taking fixes from upstream](#taking-fixes-from-upstream)
+- [Build, lint and checks](#build-lint-and-checks)
+- [Running without hardware](#running-without-hardware)
+- [Testing against a real Homebridge](#testing-against-a-real-homebridge)
+- [Homebridge settings UI: what bites](#homebridge-settings-ui-what-bites)
+- [Releasing](#releasing)
+
+---
+
+## How the code is arranged
+
+This plugin is a port of
+[`matterbridge-dyson-robot`](https://github.com/thoukydides/matterbridge-dyson-robot),
+narrowed to the Dyson 360 Vis Nav and rebuilt on the Matter support added in
+Homebridge 2.0. Two layers, with very different rules:
+
+### The Dyson layer — carried over, keep it that way
+
+Cloud API, MQTT client and parsing, message and state types, fault mapping, zone
+handling, map rendering. These files were copied from upstream with **only their
+import paths rewritten**:
+
+| Upstream | Here |
+|---|---|
+| `matterbridge/logger` | `./logger.js` |
+| `matterbridge/matter/clusters` | `./matter-clusters.js` |
+| `MaybePromise` from `matterbridge/matter` | `./utils.js` |
+| `CommonAreaNamespaceTag` from `matterbridge/matter` | `./matter-clusters.js` |
+
+Most of them are still **byte-identical to upstream** after those rewrites, which
+is what makes [upstream fixes](#taking-fixes-from-upstream) cheap to adopt. Resist
+tidying them. A gratuitous change turns a file from "apply upstream wholesale"
+into "merge by hand, forever".
+
+Where a change is genuinely warranted, make it deliberately and say why in the
+commit — the sync tool will flag the file from then on, which is correct.
+
+### The Matter layer — written for this plugin
+
+`matter-360.ts`, `matter-360-modes.ts`, `matter-clusters.ts`, `platform.ts`,
+`index.ts`, the custom UI. Matterbridge builds an endpoint imperatively from
+matter.js behaviors; Homebridge takes a declarative accessory descriptor and
+applies later changes through `updateAccessoryState`. So cluster construction and
+updates are split, and command handlers signal failure by **throwing** Matter
+protocol errors rather than returning response structs.
+
+`matter-clusters.ts` holds the Matter enumerations and struct types this plugin
+uses, with values from the specification cross-checked against `@matter/main`
+0.17.9. It exists so matter.js is **not** a dependency here: Homebridge owns that
+dependency, and a second copy resolved through this plugin could drift from the
+one actually running. Homebridge's own cluster state interfaces type every
+enumerated attribute as a plain `number`, so nothing more is needed.
+
+### Deliberate deviations from upstream
+
+- **Scope**: air treatment devices and the three local provisioning methods are
+  dropped. The Vis Nav accepts only cloud connections.
+- **`reportedPowerLevel`** in `dyson-device-360-base.ts` reports the *running*
+  cleaning strategy during a clean rather than the configured default, because a
+  Vis Nav zone can carry its own strategy. Upstream reports the default.
+- **Unreachable handling**: upstream writes `reachable` on the node's Basic
+  Information cluster. Homebridge's plugin API cannot address the node, only the
+  device endpoint, so that write fails with *"Behavior basicInformation is not
+  present on this endpoint"*. An unresponsive robot is conveyed through the
+  operational state after a grace period instead.
+- **Matter events** are not emitted at all: Homebridge 2.4.0 exposes no API for
+  them. The corresponding attributes are updated normally.
+
+---
+
+## Taking fixes from upstream
+
+`.upstream.json` records the revision this port is based on, the import rewrites,
+and which files are tracked.
+
+```bash
+npm run upstream                    # what changed since the baseline
+npm run upstream -- --ref v1.12.0   # against a specific ref
+npm run upstream -- --apply         # take the files this port has not touched
+npm run upstream -- --diff dyson-mqtt.ts
+```
+
+The tool clones upstream into `.upstream-cache/` (gitignored), applies the same
+rewrites to the newer revision, and sorts every tracked file into:
+
+- **Changed upstream, untouched here** — still byte-identical to upstream after
+  rewriting, so `--apply` replaces it wholesale, keeping this repo's file header.
+- **Changed upstream, changed here too** — listed with the `git diff` command to
+  inspect the upstream change and apply the relevant part by hand.
+- **Gone** — no longer upstream, or never carried here.
+
+`--apply` never touches a diverged file and never moves the baseline. Moving it
+is a deliberate commit:
+
+1. `npm run upstream -- --apply`
+2. Work through anything listed as diverged
+3. `npm run build && npm run lint`
+4. Replay the recorded session ([below](#running-without-hardware)) and watch the
+   state transitions
+5. Set `baseline` in `.upstream.json` to the new ref and commit
+
+### Keeping the rewrites honest
+
+`rewrites` in `.upstream.json` must mirror exactly what was done when porting.
+If it drifts, files look diverged when they are not, and the tool quietly stops
+being useful — the failure is silent, so check the count of "untouched" files
+looks plausible after a sync.
+
+---
+
+## Build, lint and checks
+
+```bash
+npm install
+npm run build     # checkers, tsc, then the three checks below
+npm run lint
+```
+
+`npm run build` runs three checks beyond the compiler. Each covers a part of a
+Homebridge plugin that no compiler or linter can see, and each was written
+*after* the bug it covers had already reached a user:
+
+| Check | Covers |
+|---|---|
+| `check-plugin-layout` | `customUi` flag, `customUiPath` resolution, `showSchemaForm()` call, `singular`, every schema property present in the layout, hidden entries wrapped and silent, UI endpoints served, `files[]` shipping the UI |
+| `check-ui-auth-config` | every plugin setting the Dyson cloud client reads is provided by the config the custom UI hands it |
+| `check-ui-server` | the custom UI's `server.js` starts as a forked child and signals `ready` |
+
+**When adding to the settings page, extend these rather than reasoning about how
+the form renders.** The rendering is not observable from here, and every attempt
+to reason about it in this project produced a wrong answer at least once.
+
+A check that does not fail against the bug it covers is worthless. Verify each
+new one by reintroducing the fault and watching it trip.
+
+---
+
+## Running without hardware
+
+`mqtt-logs/277.jsonl` is a recorded Vis Nav MQTT session, from upstream's
+regression tests. Replaying it exercises the whole state machine — cleaning,
+docking, charging, mode changes, faults — with no robot and no MyDyson account.
+
+Mock mode is deliberately **absent from the settings UI**, so write it into
+`config.json` by hand. Saving from the UI afterwards drops the `devices` block,
+since the form does not know it:
+
+```json
+{
+    "platform": "DysonVisNav",
+    "provisioningMethod": "Mock Devices",
+    "unreachableTimeout": 15,
+    "devices": [{
+        "name": "Vis Nav Test",
+        "serialNumber": "ABC-EU-TEST0001",
+        "rootTopic": "277",
+        "filename": "/absolute/path/to/mqtt-logs/277.jsonl"
+    }]
+}
+```
+
+The mock client never disconnects, so it does **not** exercise the unreachable
+path. Test that logic directly against `trackReachability` and
+`mapOperationalState` instead.
+
+---
+
+## Testing against a real Homebridge
+
+```bash
+node node_modules/homebridge/bin/homebridge -U /path/to/test-config-dir -P "$(dirname $PWD)" -D
+```
+
+`-P` points at the directory *containing* the plugin directory. The test config
+needs `bridge.matter` with `enabled: true`, a `uniqueId`, and ports that do not
+clash with anything else on the machine.
+
+What to look for:
+
+```
+✓ External Matter accessory published: Vis Nav Test on port 5530
+RVC Operational State: Docked (66) → Running (1) → SeekingCharger (64) → Charging (65)
+Battery status: 100%, Ok (0), Active (1), and IsAtFullCharge (2)
+```
+
+Two traps that cost real time:
+
+- A stale Homebridge process **renames itself to plain `homebridge`**, so
+  `pkill -f "homebridge/bin/homebridge"` misses it and the next run dies on
+  `EADDRINUSE`. Match `homebridge`, and check with `lsof -nP -iTCP:<port>`.
+- `registerPlatformAccessories` resolving does **not** mean the accessory
+  published. External accessories publish asynchronously; grep the log for
+  `External Matter accessory published` or `Behaviors have errors`.
+
+---
+
+## Homebridge settings UI: what bites
+
+Collected the hard way. All are now asserted by `check-plugin-layout`.
+
+| Requirement | What happens otherwise |
+|---|---|
+| `"customUi": true` in `config.schema.json` | The UI ignores the custom UI entirely and shows only the generated form. `customUiPath` alone just relocates the directory — it enables nothing |
+| Call `homebridge.showSchemaForm()` | A custom UI *replaces* the generated form, so the plugin's own settings are unreachable |
+| Custom UI server imports in `dependencies` | A devDependency resolves locally but is absent after install. The forked process dies on the import, never signals `ready`, and the page spins forever — with no error in the Homebridge log or the browser |
+| Every schema property present in `layout` | Absent ones still enter the form model and are validated there. One the user cannot reach leaves *"config validation failed"* next to Save, naming nothing |
+| No required sub-fields inside a `condition`-hidden fieldset | Same, and even harder to spot |
+| Hidden entries wrapped in `htmlClass: "d-none"` | `"type": "hidden"` hides only the input. The label still renders, and with no title the form derives one from the key — `provisioningMethod` becomes "Provisioning Method". `notitle` is not honoured |
+
+---
+
+## Releasing
+
+Homebridge's verified-plugin requirements include a GitHub release with notes for
+each version, so this is not optional housekeeping.
+
+1. Bump `version` in `package.json`
+2. Update the tarball URL in the README's install fallback
+3. `npm run build && npm run lint`
+4. Commit, `git tag -a vX.Y.Z`, push both
+5. `npm pack`, then `gh release create vX.Y.Z <tarball> --title … --notes …`
+
+Attach the tarball: it is prebuilt, so a Homebridge host can install it without
+git or a TypeScript toolchain. Write the notes for whoever hits the bug, not for
+the person who fixed it — symptom first, then cause.
