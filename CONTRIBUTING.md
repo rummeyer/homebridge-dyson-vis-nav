@@ -134,6 +134,17 @@ Homebridge plugin that no compiler or linter can see, and each was written
 | `check-ui-auth-config` | every plugin setting the Dyson cloud client reads is provided by the config the custom UI hands it |
 | `check-ui-server` | the custom UI's `server.js` starts as a forked child and signals `ready` |
 
+`bin/check-recorded-session.mjs` is separate, because it takes about a minute:
+it replays `mqtt-logs/277.jsonl` through the ported Dyson layer and checks the
+device reaches every state it is known to reach, with nothing logged as a warning
+or an error. Run it after adopting an upstream change. It is not a payload
+validator — a single altered field in the recording can pass unnoticed, since a
+rejected message just leaves the previous status in place.
+
+CI (`.github/workflows/build.yml`) runs the build, the lint and that replay on
+Node 22, 24 and 26 — the versions in `engines.node`. Keep the matrix in step with
+that field; verification requires the plugin to run on every supported LTS.
+
 **When adding to the settings page, extend these rather than reasoning about how
 the form renders.** The rendering is not observable from here, and every attempt
 to reason about it in this project produced a wrong answer at least once.
