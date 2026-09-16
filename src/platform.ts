@@ -19,7 +19,7 @@ import { adaptLogger } from './logger.js';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
 import { createDysonDevice } from './dyson-device.js';
 import { DysonDevice } from './dyson-device-base.js';
-import { formatList, plural } from './utils.js';
+import { plural } from './utils.js';
 import { PrefixLogger } from './logger-prefix.js';
 import { DeviceConfigMqttWithApi, DysonCloudRemote } from './dyson-cloud.js';
 import { logError } from './log-error.js';
@@ -128,11 +128,9 @@ export class PlatformDyson implements DynamicPlatformPlugin {
         const deviceLog = new PrefixLogger(this.log, deviceName);
 
         try {
-            // Apply the device filters
+            // Apply the allow list
             if (!this.validateDevice(serialNumber)) {
-                const lists = (['blackList', 'whiteList'] as const)
-                    .filter(list => this.config[list].length);
-                deviceLog.info(`Device disabled via ${formatList(lists)}`);
+                deviceLog.info('Device not in whiteList');
                 return;
             }
 
@@ -150,12 +148,11 @@ export class PlatformDyson implements DynamicPlatformPlugin {
         }
     }
 
-    // Check a device serial number against the configured filters
+    // Check a device serial number against the allow list.
+    // An empty list means every robot vacuum in the account is exposed.
     validateDevice(serialNumber: string): boolean {
-        const { whiteList, blackList } = this.config;
-        if (whiteList.length)   return whiteList.includes(serialNumber);
-        if (blackList.length)   return !blackList.includes(serialNumber);
-        return true;
+        const { whiteList } = this.config;
+        return whiteList.length === 0 || whiteList.includes(serialNumber);
     }
 
     // Cleanup resources when Homebridge is shutting down

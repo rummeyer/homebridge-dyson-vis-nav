@@ -1,0 +1,85 @@
+{
+    "repository": "https://github.com/thoukydides/matterbridge-dyson-robot.git",
+    "baseline": {
+        "ref": "v1.11.1",
+        "commit": "8871092476de5ee5ec733a320d70b751b08b95c4"
+    },
+    "comment": [
+        "The Dyson protocol layer is carried over from matterbridge-dyson-robot",
+        "with only its import paths rewritten, so upstream fixes can be adopted",
+        "almost verbatim. `npm run upstream` compares this baseline against a",
+        "newer upstream ref and reports what changed; files that still match",
+        "upstream byte for byte after rewriting can be updated automatically,",
+        "and the rest are listed for review.",
+        "",
+        "`rewrites` must mirror exactly what was done when porting, otherwise",
+        "files look diverged when they are not."
+    ],
+    "rewrites": [
+        ["from 'matterbridge/logger'", "from './logger.js'"],
+        ["from 'matterbridge/matter/clusters'", "from './matter-clusters.js'"],
+        ["import { MaybePromise } from 'matterbridge/matter';", "import { MaybePromise } from './utils.js';"],
+        ["import { CommonAreaNamespaceTag } from 'matterbridge/matter';", "import { CommonAreaNamespaceTag } from './matter-clusters.js';"]
+    ],
+    "headerLines": {
+        "upstream": 2,
+        "ours": 3
+    },
+    "tracked": [
+        "async-eventemitter.ts",
+        "decorator-changed.ts",
+        "dyson-360-cloud-types.ts",
+        "dyson-360-msg-types.ts",
+        "dyson-360-types.ts",
+        "dyson-bitmap-ansi.ts",
+        "dyson-bitmap-octet.ts",
+        "dyson-cloud-api.ts",
+        "dyson-cloud-api-device.ts",
+        "dyson-cloud-api-ua.ts",
+        "dyson-cloud-error.ts",
+        "dyson-cloud-types.ts",
+        "dyson-cloud.ts",
+        "dyson-device-360-base.ts",
+        "dyson-device-360-commands.ts",
+        "dyson-device-360-faults-table.ts",
+        "dyson-device-360-faults.ts",
+        "dyson-device-360-map.ts",
+        "dyson-device-360-zones.ts",
+        "dyson-device-360.ts",
+        "dyson-device-base.ts",
+        "dyson-device-compatibility.ts",
+        "dyson-device.ts",
+        "dyson-mqtt-360.ts",
+        "dyson-mqtt-cache.ts",
+        "dyson-mqtt-client-base.ts",
+        "dyson-mqtt-client-live.ts",
+        "dyson-mqtt-client-mock.ts",
+        "dyson-mqtt-connect.ts",
+        "dyson-mqtt-filter.ts",
+        "dyson-mqtt-parse.ts",
+        "dyson-mqtt-subscribe.ts",
+        "dyson-mqtt.ts",
+        "dyson-types.ts",
+        "error-360.ts",
+        "log-error.ts",
+        "logger-options.ts",
+        "periodic.ts",
+        "utils.ts"
+    ],
+    "notPorted": {
+        "comment": "Upstream files this plugin deliberately does not carry. Changes here never need adopting, but a new file appearing upstream is worth a look.",
+        "files": [
+            "dyson-air-*.ts",
+            "dyson-device-air*.ts",
+            "endpoint-*.ts",
+            "platform.ts",
+            "index.ts",
+            "settings.ts",
+            "config-types.ts",
+            "config-check.ts",
+            "check-versions.ts",
+            "logger-filter.ts",
+            "logger-prefix.ts"
+        ]
+    }
+}

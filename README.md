@@ -82,7 +82,7 @@ Most settings have sensible defaults. The full set:
 | `provisioningMethod` | `Remote Account` | `Remote Account` for a real device, `Mock Devices` to replay a recorded session |
 | `dysonAccount.email` / `.password` | — | MyDyson credentials |
 | `dysonAccount.china` | `false` | Set for accounts registered in China |
-| `whiteList` / `blackList` | `[]` | Filter by serial number |
+| `whiteList` | `[]` | Only these serial numbers are exposed; empty exposes every robot in the account |
 | `simpleModeTagsRvc` | `true` | Advertise one descriptive mode tag per cleaning mode instead of the full set |
 | `wildcardTopic` | `false` | Subscribe to all MQTT topics — useful when capturing logs for a bug report |
 | `logMapStyle` | `Off` | Render a map of each completed clean into the log |
@@ -112,6 +112,24 @@ Most settings have sensible defaults. The full set:
 The Dyson protocol layer — cloud API, MQTT client, message parsing, state and fault mapping, zone handling — is ported essentially unchanged from `matterbridge-dyson-robot`, which is validated against physical devices.
 
 The Matter layer is new. It has been verified end-to-end against Homebridge 2.4.0 with the recorded session above: the accessory publishes as a standalone Matter node and all five clusters (`rvcRunMode`, `rvcCleanMode`, `rvcOperationalState`, `serviceArea`, `powerSource`) track the device through cleaning, docking, charging and fault states. It has **not** yet been tested against a physical Vis Nav, nor paired with the Apple Home app.
+
+## Adopting upstream fixes
+
+The Dyson protocol layer was copied from
+[`matterbridge-dyson-robot`](https://github.com/thoukydides/matterbridge-dyson-robot)
+with only its import paths rewritten, so upstream fixes can be taken almost
+verbatim. `.upstream.json` records the revision this port is based on, and:
+
+```
+npm run upstream                 # what changed since, against the latest tag
+npm run upstream -- --ref v1.12.0
+npm run upstream -- --apply      # take the files this port has not touched
+```
+
+Files are sorted into two groups: those still byte-identical to upstream after
+rewriting, which `--apply` updates wholesale, and those this port has since
+changed, which are listed with the command to inspect the upstream diff. The
+baseline is only moved by hand, once the result builds and passes its checks.
 
 ## Credits
 

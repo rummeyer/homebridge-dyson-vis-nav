@@ -58,9 +58,8 @@ export interface ConfigBase {
     // Homebridge additions
     platform:               string;
     name?:                  string;
-    // Device filtering, by serial number
+    // Only these serial numbers are exposed; empty means all of them
     whiteList:              string[];
-    blackList:              string[];
     // Plugin configuration
     provisioningMethod:     ProvisioningMethod;
     simpleModeTagsRvc:      boolean;

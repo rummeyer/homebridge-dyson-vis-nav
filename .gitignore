@@ -3,3 +3,4 @@ dist/
 src/ti/
 *.tgz
 .DS_Store
+.upstream-cache/

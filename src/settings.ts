@@ -33,7 +33,6 @@ export const PLATFORM_NAME  = 'DysonVisNav';
 // Default configuration options
 export const DEFAULT_CONFIG: Readonly<Partial<Config>> = {
     whiteList:              [],
-    blackList:              [],
     provisioningMethod:     'Remote Account',
     ...(process.env.DYSON_TOKEN && {
         dysonAccount: {

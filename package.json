@@ -2,7 +2,7 @@
     "name": "homebridge-dyson-vis-nav",
     "displayName": "Dyson 360 Vis Nav",
     "description": "A Homebridge plugin that exposes the Dyson 360 Vis Nav robot vacuum to Apple Home as a native Matter robot vacuum cleaner, via the Dyson AWS IoT MQTT gateway.",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "license": "ISC",
     "author": {
         "name": "Oliver Rummeyer",
@@ -70,7 +70,8 @@
         "prepublishOnly": "npm run build && npm run lint",
         "check-layout": "tsx bin/check-plugin-layout.ts",
         "check-ui-server": "node bin/check-ui-server.mjs",
-        "check-ui-config": "node bin/check-ui-auth-config.mjs"
+        "check-ui-config": "node bin/check-ui-auth-config.mjs",
+        "upstream": "node bin/upstream-sync.mjs"
     },
     "files": [
         "dist/",

@@ -46,7 +46,6 @@
                     "email": {
                         "title": "Email Address",
                         "type": "string",
-                        "format": "email",
                         "description": "The email address used with the MyDyson app. Entered in the MyDyson Account box above."
                     },
                     "password": {
@@ -107,16 +106,7 @@
                     "title": "Serial Number",
                     "type": "string"
                 },
-                "description": "If non-empty, only these devices are exposed."
-            },
-            "blackList": {
-                "title": "Serial Number Block List",
-                "type": "array",
-                "items": {
-                    "title": "Serial Number",
-                    "type": "string"
-                },
-                "description": "Devices to exclude. Ignored if the allow list is non-empty."
+                "description": "If non-empty, only these serial numbers are exposed. Leave empty to expose every robot vacuum in the account."
             },
             "simpleModeTagsRvc": {
                 "title": "Use simple RVC Clean Mode tags",
@@ -229,29 +219,9 @@
                     "type": "array",
                     "title": "Serial Number Allow List",
                     "add": "Add serial number",
-                    "style": {
-                        "add": "btn-primary"
-                    },
                     "items": [
                         {
                             "key": "whiteList[]",
-                            "type": "string",
-                            "title": "Serial Number",
-                            "placeholder": "e.g. ABC-EU-XXX1234A"
-                        }
-                    ]
-                },
-                {
-                    "key": "blackList",
-                    "type": "array",
-                    "title": "Serial Number Block List",
-                    "add": "Add serial number",
-                    "style": {
-                        "add": "btn-primary"
-                    },
-                    "items": [
-                        {
-                            "key": "blackList[]",
                             "type": "string",
                             "title": "Serial Number",
                             "placeholder": "e.g. ABC-EU-XXX1234A"
@@ -284,6 +254,22 @@
                     ]
                 }
             ]
+        },
+        {
+            "key": "dysonAccount.email",
+            "type": "hidden"
+        },
+        {
+            "key": "dysonAccount.password",
+            "type": "hidden"
+        },
+        {
+            "key": "dysonAccount.china",
+            "type": "hidden"
+        },
+        {
+            "key": "dysonAccount.token",
+            "type": "hidden"
         }
     ]
 }
