@@ -62,19 +62,16 @@ Homebridge 2.0 speaks Matter alongside HomeKit, so switching it on costs you not
 Open the Homebridge UI, go to **Plugins**, search for `homebridge-dyson-vis-nav`, and click **Install**.
 
 <details>
-<summary><b>Not on npm yet — use this instead</b></summary>
+<summary>Installing from the command line instead</summary>
 
-Until the plugin is published to npm, the Homebridge UI's search will not find it. Install a release build over SSH instead:
+Install into the directory `hb-service` uses for plugins — on a standard install that is `<storage path>/node_modules`, with the storage path usually `/var/lib/homebridge`:
 
 ```bash
-sudo npm --prefix /var/lib/homebridge install \
-  https://github.com/rummeyer/homebridge-dyson-vis-nav/releases/download/v0.3.0/homebridge-dyson-vis-nav-0.3.0.tgz
+sudo npm --prefix /var/lib/homebridge install homebridge-dyson-vis-nav
 sudo hb-service restart
 ```
 
-`/var/lib/homebridge` is the usual Homebridge storage path; if yours differs, the Homebridge UI shows it under **Settings**. The download is prebuilt, so your Homebridge machine needs no build tools.
-
-Note that `hb-service add` does **not** work with a URL — it only accepts plugin names from npm.
+`hb-service add homebridge-dyson-vis-nav` works too. It does **not** accept URLs or file paths, only names from npm.
 </details>
 
 ## Step 3 — Connect your MyDyson account

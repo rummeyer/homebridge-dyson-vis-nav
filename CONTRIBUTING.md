@@ -223,11 +223,34 @@ Homebridge's verified-plugin requirements include a GitHub release with notes fo
 each version, so this is not optional housekeeping.
 
 1. Bump `version` in `package.json`
-2. Update the tarball URL in the README's install fallback
-3. `npm run build && npm run lint`
-4. Commit, `git tag -a vX.Y.Z`, push both
-5. `npm pack`, then `gh release create vX.Y.Z <tarball> --title … --notes …`
+2. `npm run build && npm run lint`
+3. Commit, `git tag -a vX.Y.Z`, push both
+4. `npm pack`, then `gh release create vX.Y.Z <tarball> --title … --notes …`
+5. `npx --yes npm@latest publish`
 
-Attach the tarball: it is prebuilt, so a Homebridge host can install it without
-git or a TypeScript toolchain. Write the notes for whoever hits the bug, not for
-the person who fixed it — symptom first, then cause.
+Attach the tarball to the GitHub release as well as publishing to npm: the
+release notes are a verification requirement, and a prebuilt tarball lets anyone
+install a specific version without npm. Write the notes for whoever hits the
+bug, not for the person who fixed it — symptom first, then cause.
+
+### Publishing needs care on this machine
+
+The system `npm` is 8.5.0 from a Node 16 install, and prepending the npx Node 22
+directory to `PATH` swaps only `node` — the `node` package ships no `npm`. So use
+`npx --yes npm@latest` for both `login` and `publish`, with Node 22 on `PATH`
+because the publish runs `build && lint`:
+
+```bash
+export PATH="$(ls -d ~/.npm/_npx/*/node_modules/node/bin | head -1):$PATH"
+npx --yes npm@latest publish
+```
+
+npm asks for a one-time password. It offers a browser URL, but that URL is
+redacted in some terminals as a secret, so either run the publish in a plain
+terminal or pass `--otp=<code>` from an authenticator app.
+
+`prepublishOnly` and `prepare` both build, so a publish builds twice. That is
+deliberate: `prepare` is what makes a `github:` install work, and
+`prepublishOnly` is what guarantees lint passes before an upload. Reordering
+them to save the duplicate risks linting before the generated type checkers
+exist, which is a worse trade than a few seconds.
