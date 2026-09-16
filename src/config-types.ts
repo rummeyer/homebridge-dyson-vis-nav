@@ -66,7 +66,9 @@ export interface ConfigBase {
     simpleModeTagsRvc:      boolean;
     wildcardTopic:          boolean;
     logMapStyle:            LogMapStyle;
-    statusPollInterval:     number;
+    // Seconds the robot may stay unreachable before its activity is reported as
+    // unknown instead of repeating the last state seen.
+    unreachableTimeout:     number;
     debug:                  boolean;
     debugFeatures:          DebugFeatures[];
 }

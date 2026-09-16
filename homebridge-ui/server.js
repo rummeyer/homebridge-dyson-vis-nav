@@ -19,8 +19,9 @@ class DysonUiServer extends HomebridgePluginUiServer {
     constructor() {
         super();
 
-        this.onRequest('/start-auth',  request => this.startAuth(request));
-        this.onRequest('/finish-auth', request => this.finishAuth(request));
+        this.onRequest('/auth-status', request => this.authStatus(request));
+        this.onRequest('/start-auth',   request => this.startAuth(request));
+        this.onRequest('/finish-auth',  request => this.finishAuth(request));
 
         this.ready();
     }
@@ -53,6 +54,43 @@ class DysonUiServer extends HomebridgePluginUiServer {
         });
         await persist.init();
         return persist;
+    }
+
+    // Report whether this account is authorised.
+    //
+    // A stored token is not the same as a working one: tokens expire and can be
+    // revoked, and the plugin then fails at startup. So this actually exercises
+    // the token against the API rather than merely noting its presence, which
+    // lets the UI re-offer the code request exactly when it is needed.
+    async authStatus(request) {
+        const email = request?.account?.email;
+        if (typeof email !== 'string' || !email.length) {
+            return { authorised: false, reason: 'no-email' };
+        }
+
+        const persist = await this.createPersist();
+        const stored = await persist.getItem(`${email}:token`);
+        if (!stored?.token) return { authorised: false, reason: 'no-token' };
+
+        const { log } = this.createLogger();
+        try {
+            const account = { email, password: '', china: request.account.china === true };
+            const api = new DysonCloudAuth(log, makeAuthConfig(), persist, account);
+            const devices = await (await api.api).getManifest();
+            return {
+                authorised: true,
+                created:    stored.created ?? null,
+                devices:    Array.isArray(devices) ? devices.length : null
+            };
+        } catch (err) {
+            return {
+                authorised: false,
+                reason:     'rejected',
+                created:    stored.created ?? null,
+                message:    `The stored authorisation is no longer accepted by Dyson (${describeError(err)}).`
+                          + ' Request a new code.'
+            };
+        }
     }
 
     // Validate the account details supplied by the browser

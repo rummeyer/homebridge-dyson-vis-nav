@@ -47,14 +47,12 @@
                         "title": "Email Address",
                         "type": "string",
                         "format": "email",
-                        "required": true,
-                        "description": "The email address used with the MyDyson app."
+                        "description": "The email address used with the MyDyson app. Entered in the MyDyson Account box above."
                     },
                     "password": {
                         "title": "Password",
                         "type": "string",
-                        "required": true,
-                        "description": "The password used with the MyDyson app."
+                        "description": "The password used with the MyDyson app. Entered in the MyDyson Account box above."
                     },
                     "china": {
                         "title": "Account registered in China",
@@ -158,12 +156,13 @@
                 ],
                 "description": "Render a map of each completed clean into the log."
             },
-            "statusPollInterval": {
-                "title": "Status Poll Interval (seconds)",
+            "unreachableTimeout": {
+                "title": "Unreachable Timeout (seconds)",
                 "type": "integer",
-                "default": 30,
-                "minimum": 5,
-                "maximum": 3600
+                "default": 120,
+                "minimum": 10,
+                "maximum": 3600,
+                "description": "How long the robot may stay silent before Apple Home is told its activity is unknown. Until then the last known state is kept, so a brief network dropout does not make the tile flicker."
             },
             "debug": {
                 "title": "Enable debug logging",
@@ -200,7 +199,24 @@
                 "functionBody": "return model.provisioningMethod === 'Mock Devices';"
             },
             "items": [
-                "devices"
+                {
+                    "key": "devices",
+                    "type": "array",
+                    "title": "Mock Devices",
+                    "add": "Add device",
+                    "items": [
+                        {
+                            "type": "fieldset",
+                            "title": "Device",
+                            "items": [
+                                "devices[].name",
+                                "devices[].serialNumber",
+                                "devices[].rootTopic",
+                                "devices[].filename"
+                            ]
+                        }
+                    ]
+                }
             ]
         },
         {
@@ -208,8 +224,40 @@
             "title": "Device Filtering",
             "expandable": true,
             "items": [
-                "whiteList",
-                "blackList"
+                {
+                    "key": "whiteList",
+                    "type": "array",
+                    "title": "Serial Number Allow List",
+                    "add": "Add serial number",
+                    "style": {
+                        "add": "btn-primary"
+                    },
+                    "items": [
+                        {
+                            "key": "whiteList[]",
+                            "type": "string",
+                            "title": "Serial Number",
+                            "placeholder": "e.g. ABC-EU-XXX1234A"
+                        }
+                    ]
+                },
+                {
+                    "key": "blackList",
+                    "type": "array",
+                    "title": "Serial Number Block List",
+                    "add": "Add serial number",
+                    "style": {
+                        "add": "btn-primary"
+                    },
+                    "items": [
+                        {
+                            "key": "blackList[]",
+                            "type": "string",
+                            "title": "Serial Number",
+                            "placeholder": "e.g. ABC-EU-XXX1234A"
+                        }
+                    ]
+                }
             ]
         },
         {
@@ -220,9 +268,21 @@
                 "simpleModeTagsRvc",
                 "wildcardTopic",
                 "logMapStyle",
-                "statusPollInterval",
+                "unreachableTimeout",
                 "debug",
-                "debugFeatures"
+                {
+                    "key": "debugFeatures",
+                    "type": "array",
+                    "title": "Debug Features",
+                    "add": "Add debug feature",
+                    "items": [
+                        {
+                            "key": "debugFeatures[]",
+                            "type": "string",
+                            "title": "Feature"
+                        }
+                    ]
+                }
             ]
         }
     ]

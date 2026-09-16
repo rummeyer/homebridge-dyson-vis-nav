@@ -97,6 +97,19 @@ if (existsSync(join(root, serverRel))) {
     }
 }
 
+// Every endpoint the page asks for must be served. The page reaches some of
+// them through a helper rather than calling homebridge.request directly, so
+// match on the path literals instead of the call site.
+if (existsSync(join(root, indexRel)) && existsSync(join(root, serverRel))) {
+    const html   = read(indexRel);
+    const server = read(serverRel);
+    const paths  = new Set([...html.matchAll(/'(\/[a-z][a-z0-9-]*)'/gi)].map(m => m[1]));
+    for (const path of paths) {
+        check(server.includes(`onRequest('${path}'`),
+              `${indexRel} requests "${path}", which ${serverRel} does not serve`);
+    }
+}
+
 const files = pkg.files ?? [];
 const covers = (entry: string): boolean =>
     files.some(f => f === entry || f === `${entry}/` || f.startsWith(`${entry}/`));

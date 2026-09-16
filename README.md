@@ -24,7 +24,7 @@ This plugin is not on the npm registry, so the Homebridge UI's plugin search wil
 2. On the Homebridge host, install the plugin into the same directory `hb-service` uses for plugins. On a standard `hb-service` install that is `<storage path>/node_modules`, with the storage path usually `/var/lib/homebridge`:
    ```
    sudo npm --prefix /var/lib/homebridge install \
-     https://github.com/rummeyer/homebridge-dyson-vis-nav/releases/download/v0.1.4/homebridge-dyson-vis-nav-0.1.4.tgz
+     https://github.com/rummeyer/homebridge-dyson-vis-nav/releases/download/v0.2.0/homebridge-dyson-vis-nav-0.2.0.tgz
    sudo hb-service restart
    ```
    The tarball is prebuilt, so the host needs neither git nor a TypeScript toolchain.
@@ -60,6 +60,13 @@ The 360 Vis Nav does not accept local MQTT connections, unlike the older 360 Eye
 | Zone cleaning | ✅ (Vis Nav only feature; zone list comes from the MyDyson account) |
 | Clean map rendered into the log | ✅ (optional, see `logMapStyle`) |
 
+### When the robot is unreachable
+
+The robot is marked unreachable a few seconds after it stops responding, and its
+activity is reported as unknown once `unreachableTimeout` (120 s by default)
+elapses. Without that, the last state seen would stand indefinitely — a robot
+that vanished mid-clean would keep showing as cleaning.
+
 ### Known limitations
 
 - **No Matter cluster events.** Homebridge 2.4.0 exposes no API for emitting them, so the `OperationalError`, `OperationCompletion`, `BatFaultChange` and `BatChargeFaultChange` events of the Matterbridge original are written to the log instead. The corresponding *attributes* are updated normally, and those are what the Home app reads — so this is not visible in day-to-day use.
@@ -79,7 +86,7 @@ Most settings have sensible defaults. The full set:
 | `simpleModeTagsRvc` | `true` | Advertise one descriptive mode tag per cleaning mode instead of the full set |
 | `wildcardTopic` | `false` | Subscribe to all MQTT topics — useful when capturing logs for a bug report |
 | `logMapStyle` | `Off` | Render a map of each completed clean into the log |
-| `statusPollInterval` | `30` | Seconds between status polls |
+| `unreachableTimeout` | `120` | Seconds the robot may stay silent before Apple Home is told its activity is unknown |
 | `debug` / `debugFeatures` | `false` / `[]` | Diagnostic logging |
 
 ### Testing without hardware

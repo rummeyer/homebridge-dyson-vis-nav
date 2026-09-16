@@ -305,13 +305,13 @@ export class MatterAccessory360 {
     // Update the reachability of the device.
     //
     // A robot vacuum is published as its own Matter node rather than as a
-    // bridged device, so there is no Bridged Device Basic Information cluster
-    // whose `reachable` attribute could carry this. Controllers infer
-    // reachability from the node itself, so this is logged only.
+    // bridged device, so this goes on the node's Basic Information cluster
+    // rather than a Bridged Device Basic Information one. Controllers use it to
+    // show that the accessory is not responding.
     @ifValueChanged
-    updateReachable(reachable: boolean): Promise<void> {
-        this.log.info(`${AN}Device${RI}: ${AV}${reachable ? 'reachable' : 'unreachable'}${RI}`);
-        return Promise.resolve();
+    async updateReachable(reachable: boolean): Promise<void> {
+        this.log.info(`${AN}Reachable${RI}: ${AV}${reachable}${RI}`);
+        await this.updateState('basicInformation', { reachable });
     }
 
     // Update the Power Source cluster attributes when required

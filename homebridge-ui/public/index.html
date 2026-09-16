@@ -1,43 +1,61 @@
 <style>
-    .dy-box      { border: 1px solid rgba(127,127,127,.3); border-radius: .375rem;
-                   padding: 1rem; margin-bottom: 1.25rem; }
-    .dy-box h5   { margin: 0 0 .25rem; font-size: 1rem; }
-    .dy-hint     { font-size: .8rem; opacity: .7; margin-bottom: .9rem; }
-    .dy-row      { display: flex; gap: .5rem; align-items: flex-start; }
-    .dy-row input{ flex: 1 1 auto; min-width: 0; }
-    .dy-row .btn { flex: 0 0 auto; white-space: nowrap; }
-    .dy-msg      { margin-top: .75rem; margin-bottom: 0; font-size: .85rem; }
-    .dy-hidden   { display: none; }
+    .dy-box       { border: 1px solid rgba(127,127,127,.3); border-radius: .375rem;
+                    padding: 1rem; margin-bottom: 1.25rem; }
+    .dy-box h5    { margin: 0 0 .25rem; font-size: 1rem; }
+    .dy-hint      { font-size: .8rem; opacity: .7; margin-bottom: 1rem; }
+    .dy-field     { margin-bottom: 1rem; }
+    .dy-field label { margin-bottom: .25rem; }
+    .dy-check     { margin: 1.25rem 0; }
+    .dy-auth      { border-top: 1px solid rgba(127,127,127,.25); padding-top: 1rem; margin-top: .25rem; }
+    .dy-row       { display: flex; gap: .5rem; align-items: flex-start; }
+    .dy-row input { flex: 1 1 auto; min-width: 0; }
+    .dy-row .btn  { flex: 0 0 auto; white-space: nowrap; }
+    .dy-status    { display: flex; gap: .5rem; align-items: baseline; flex-wrap: wrap; }
+    .dy-ok        { color: var(--bs-success, #2e9e5b); font-weight: 600; }
+    .dy-msg       { margin-top: .75rem; margin-bottom: 0; font-size: .85rem; }
+    .dy-link      { background: none; border: 0; padding: 0; font-size: .85rem;
+                    text-decoration: underline; cursor: pointer; color: inherit; opacity: .75; }
+    .dy-hidden    { display: none; }
 </style>
 
-<div class="dy-box" id="dyBox">
+<div class="dy-box">
     <h5>MyDyson Account</h5>
     <div class="dy-hint">
         Nothing to do in the MyDyson app &mdash; <em>Request code</em> asks Dyson to email you one.
     </div>
 
-    <div class="form-group">
+    <div class="form-group dy-field">
         <label for="dyEmail">Email address</label>
         <input type="email" class="form-control" id="dyEmail" autocomplete="username">
     </div>
 
-    <div class="form-group">
+    <div class="form-group dy-field">
         <label for="dyPassword">Password</label>
         <input type="password" class="form-control" id="dyPassword" autocomplete="current-password">
     </div>
 
-    <div class="form-check mb-3">
+    <div class="form-check dy-check">
         <input type="checkbox" class="form-check-input" id="dyChina">
         <label class="form-check-label" for="dyChina">Account registered in China</label>
     </div>
 
-    <div class="form-group mb-0">
-        <label for="dyCode">Auth code</label>
-        <div class="dy-row">
-            <input type="text" class="form-control" id="dyCode"
-                   autocomplete="one-time-code" placeholder="from the Dyson email">
-            <button type="button" class="btn btn-secondary" id="dyRequest">Request code</button>
-            <button type="button" class="btn btn-primary"   id="dySubmit">Submit</button>
+    <div class="dy-auth">
+        <!-- Shown once a token is stored for this account -->
+        <div id="dyDone" class="dy-status dy-hidden">
+            <span class="dy-ok">&check; Authorised</span>
+            <span id="dyDoneWhen" class="dy-hint" style="margin:0"></span>
+            <button type="button" class="dy-link" id="dyAgain">Authorise again</button>
+        </div>
+
+        <!-- Shown until then, or when re-authorising -->
+        <div id="dyForm" class="form-group mb-0">
+            <label for="dyCode">Auth code</label>
+            <div class="dy-row">
+                <input type="text" class="form-control" id="dyCode"
+                       autocomplete="one-time-code" placeholder="from the Dyson email">
+                <button type="button" class="btn btn-secondary" id="dyRequest">Request code</button>
+                <button type="button" class="btn btn-primary"   id="dySubmit">Submit</button>
+            </div>
         </div>
     </div>
 
@@ -57,6 +75,7 @@
         msgEl.textContent = text;
         msgEl.className = `alert dy-msg alert-${kind}`;
     };
+    const clearMsg = () => { msgEl.className = 'alert dy-msg dy-hidden'; };
 
     // Read the plugin's config block, creating it if this is a first run
     const readConfig = async () => {
@@ -64,15 +83,6 @@
         if (!configs.length) configs.push({ platform: 'DysonVisNav' });
         configs[0].dysonAccount ??= {};
         return configs;
-    };
-
-    // Load the account fields into the inputs
-    const load = async () => {
-        const [config] = await readConfig();
-        const account = config.dysonAccount;
-        $('dyEmail').value    = account.email    ?? '';
-        $('dyPassword').value = account.password ?? '';
-        $('dyChina').checked  = account.china === true;
     };
 
     // Write the inputs back into the config held by the UI.
@@ -88,16 +98,66 @@
         return configs[0].dysonAccount;
     };
 
+    // Collapse the code request once the stored token is confirmed working. It
+    // stays reachable behind "Authorise again" because a token can be revoked
+    // between visits, and re-opens on its own when the check finds it rejected.
+    const showAuthorised = (created, devices) => {
+        $('dyDone').classList.remove('dy-hidden');
+        $('dyForm').classList.add('dy-hidden');
+        const parts = [];
+        if (created) parts.push(`since ${new Date(created).toLocaleDateString()}`);
+        if (typeof devices === 'number') {
+            parts.push(`${devices} device${devices === 1 ? '' : 's'} in the account`);
+        }
+        $('dyDoneWhen').textContent = parts.join(' · ');
+    };
+    const showCodeRequest = () => {
+        $('dyDone').classList.add('dy-hidden');
+        $('dyForm').classList.remove('dy-hidden');
+    };
+
+    // Ask the server whether this account already holds a token
+    const refreshStatus = async () => {
+        const account = await store();
+        if (!account.email) { showCodeRequest(); return; }
+        try {
+            const status = await homebridge.request('/auth-status', { account });
+            if (status.authorised) {
+                showAuthorised(status.created, status.devices);
+                clearMsg();
+            } else {
+                showCodeRequest();
+                // Only explain when a stored authorisation stopped working;
+                // having none yet is the normal first-run state.
+                if (status.reason === 'rejected') show(status.message, 'warning');
+            }
+        } catch {
+            showCodeRequest();
+        }
+    };
+
+    // Load the account fields into the inputs
+    const load = async () => {
+        const [config] = await readConfig();
+        const account = config.dysonAccount;
+        $('dyEmail').value    = account.email    ?? '';
+        $('dyPassword').value = account.password ?? '';
+        $('dyChina').checked  = account.china === true;
+        await refreshStatus();
+    };
+
     for (const id of ['dyEmail', 'dyPassword', 'dyChina']) {
-        $(id).addEventListener('change', () => { void store(); });
+        $(id).addEventListener('change', () => { void refreshStatus(); });
     }
 
+    $('dyAgain').addEventListener('click', () => { clearMsg(); showCodeRequest(); });
+
     // Call the plugin's UI server
-    const call = async (path, extra, button) => {
+    const call = async (path, extra) => {
         const account = await store();
         if (!account.email || !account.password) {
             show('Enter your MyDyson email address and password first.', 'warning');
-            return;
+            return false;
         }
         const buttons = [$('dyRequest'), $('dySubmit')];
         buttons.forEach(b => { b.disabled = true; });
@@ -105,22 +165,30 @@
         try {
             const response = await homebridge.request(path, { account, ...extra });
             show(response.message, 'success');
+            return true;
         } catch (err) {
             show(err.message, 'danger');
+            return false;
         } finally {
             homebridge.hideSpinner();
             buttons.forEach(b => { b.disabled = false; });
         }
     };
 
-    $('dyRequest').addEventListener('click', () => { void call('/start-auth', {}, $('dyRequest')); });
+    $('dyRequest').addEventListener('click', () => { void call('/start-auth', {}); });
+
     $('dySubmit').addEventListener('click', () => {
         const otpCode = $('dyCode').value.trim();
         if (!otpCode) {
             show('Enter the code from the Dyson email.', 'warning');
             return;
         }
-        void call('/finish-auth', { otpCode }, $('dySubmit'));
+        void (async () => {
+            if (await call('/finish-auth', { otpCode })) {
+                $('dyCode').value = '';
+                await refreshStatus();
+            }
+        })();
     });
 
     void load();

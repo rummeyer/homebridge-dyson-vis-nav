@@ -136,6 +136,16 @@ export abstract class DysonDevice360Base
     // State used to detect the end of a clean
     runMode = RvcRunMode360.Idle;
 
+    // Tracking of a device that has stopped responding.
+    //
+    // Until the configured timeout elapses the last known state is kept, so a
+    // brief MQTT dropout does not make the accessory flicker; after it,
+    // continuing to claim the robot is cleaning would be a statement we cannot
+    // support.
+    unreachableTimer?:  NodeJS.Timeout;
+    unreachableSince?:  number;
+    get unreachableGrace(): number { return this.config.unreachableTimeout * MS; }
+
     // Construct a new Dyson device instance
     constructor(...args: DysonDeviceConstructorParams<DysonMqtt360>) {
         super(...args);
@@ -215,6 +225,8 @@ export abstract class DysonDevice360Base
 
     // Stop the device when Homebridge is shutting down
     override async stop(): Promise<void> {
+        clearTimeout(this.unreachableTimer);
+        this.unreachableTimer = undefined;
         this.mqtt.off('status', this.mqttStatusListener);
         await super.stop();
     }
@@ -298,6 +310,9 @@ export abstract class DysonDevice360Base
     async updateClusterAttributes(status: DysonMqttStatus<DysonMqttStatus360>): Promise<void> {
         assertIsDefined(this.endpoint);
 
+        // Start or clear the grace period for an unresponsive device
+        this.trackReachability(status.reachable);
+
         // Map the state to cluster attribute values
         const faults = mapDyson360Faults(this.log, status.state, status.faults, status.activeFaults);
         const cleanMode         = this.powerModeToCleanMode(this.getPowerLevel());
@@ -320,6 +335,38 @@ export abstract class DysonDevice360Base
         if (runMode === RvcRunMode360.Idle && prevRunMode === RvcRunMode360.Cleaning) {
             if (status.cleanId) await this.logCompletedClean(status.cleanId, status.cleanDuration);
         }
+    }
+
+    // Track how long the device has been unreachable.
+    //
+    // No further MQTT status arrives once the device stops responding, so the
+    // expiry of the grace period has to be driven by a timer; otherwise the
+    // last known activity would be reported indefinitely.
+    trackReachability(reachable: boolean): void {
+        if (reachable) {
+            if (this.unreachableSince !== undefined) {
+                this.log.info('Device is responding again');
+            }
+            clearTimeout(this.unreachableTimer);
+            this.unreachableTimer = undefined;
+            this.unreachableSince = undefined;
+        } else if (this.unreachableSince === undefined) {
+            this.unreachableSince = Date.now();
+            this.unreachableTimer = globalThis.setTimeout(() => {
+                this.log.warn(`Device has not responded for ${formatMilliseconds(this.unreachableGrace)};`
+                            + ' reporting its activity as unknown');
+                // Re-run the mapping so the clusters stop reporting stale activity
+                void this.updateClusterAttributes(this.mqtt.status);
+            }, this.unreachableGrace);
+            this.unreachableTimer.unref();
+
+        }
+    }
+
+    // Whether the device has been unreachable for longer than the grace period
+    get unreachableExpired(): boolean {
+        return this.unreachableSince !== undefined
+            && this.unreachableGrace <= Date.now() - this.unreachableSince;
     }
 
     // Convert the battery status to Power Source cluster attributes
@@ -361,6 +408,23 @@ export abstract class DysonDevice360Base
     ): UpdateRvcOperationalState360 {
         const mappedState = mapState(status.state);
         const isActive = mappedState.runMode !== RvcRunMode360.Idle;
+
+        // A device that stopped responding long ago tells us nothing about what
+        // it is doing now, so report the uncertainty rather than repeating the
+        // last thing we saw. Matter has no "unknown" operational state, so this
+        // uses a manufacturer-specific error, which controllers surface as a
+        // problem with the accessory instead of as ongoing activity.
+        if (this.unreachableExpired) {
+            return {
+                isActive:           false,
+                operationalState:   RvcOperationalState.OperationalState.Error,
+                operationalError:   {
+                    errorStateId:       RvcOperationalState.ErrorState.OtherError,
+                    errorStateLabel:    'Unreachable',
+                    errorStateDetails:  'No response from the robot'
+                }
+            };
+        }
 
         // Ensure consistent Operational State and Operational Error
         const { operationalError } = faults;

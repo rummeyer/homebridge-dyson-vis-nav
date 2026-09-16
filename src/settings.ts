@@ -44,7 +44,7 @@ export const DEFAULT_CONFIG: Readonly<Partial<Config>> = {
     wildcardTopic:          false,
     simpleModeTagsRvc:      true,
     logMapStyle:            'Off',
-    statusPollInterval:     30,
+    unreachableTimeout:     120,
     debug:                  false,
     debugFeatures:          []
 };
