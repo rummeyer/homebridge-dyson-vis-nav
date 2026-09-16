@@ -35,9 +35,9 @@ This plugin is not on the npm registry, so the Homebridge UI's plugin search wil
    ```
    sudo npm --prefix /var/lib/homebridge install github:rummeyer/homebridge-dyson-vis-nav
    ```
-3. Reload the Homebridge UI. The plugin appears under *Plugins*. Open its settings: the MyDyson authorisation steps are shown at the top, with the configuration form directly below them.
-4. Fill in **Email Address** and **Password** in the form, then scroll up and click **Request code**. There is nothing to do in the MyDyson app itself — the plugin asks Dyson to send the email, which arrives titled "Log in to your MyDyson App".
-5. Enter the code from that email and click **Submit code**.
+3. Reload the Homebridge UI. The plugin appears under *Plugins*. Its settings open with a **MyDyson Account** box at the top, and the rest of the configuration below it.
+4. Enter your email address and password, then click **Request code**. There is nothing to do in the MyDyson app itself — the plugin asks Dyson to send the email, which arrives titled "Log in to your MyDyson App".
+5. Put the code from that email in **Auth code** and click **Submit**.
 6. Save the configuration and restart Homebridge.
 7. The robot is published as its **own Matter node**, not through the Homebridge bridge, so it has a **separate pairing code**. Find it in the Homebridge log (`📱 Commissioning codes for <name>`) and add it in the Home app with *Add Accessory → More options*.
 

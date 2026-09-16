@@ -5,7 +5,7 @@
     "customUi": true,
     "customUiPath": "./homebridge-ui",
     "headerDisplay": "Exposes the Dyson 360 Vis Nav robot vacuum to Apple Home as a native Matter robot vacuum cleaner.\n\n**Matter must be enabled** in the Homebridge settings: a robot vacuum has no HomeKit (HAP) equivalent, so this plugin cannot work without it.",
-    "footerDisplay": "Scroll up to the **MyDyson Account** section to request the one-time code once the email address and password above are filled in.",
+    "footerDisplay": "The MyDyson account fields and the one-time code are in the box above.",
     "schema": {
         "type": "object",
         "properties": {
@@ -192,20 +192,6 @@
     "layout": [
         "name",
         "provisioningMethod",
-        {
-            "type": "fieldset",
-            "title": "MyDyson Account",
-            "expandable": true,
-            "expanded": true,
-            "condition": {
-                "functionBody": "return model.provisioningMethod === 'Remote Account';"
-            },
-            "items": [
-                "dysonAccount.email",
-                "dysonAccount.password",
-                "dysonAccount.china"
-            ]
-        },
         {
             "type": "fieldset",
             "title": "Mock Devices",
