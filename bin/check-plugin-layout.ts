@@ -33,7 +33,17 @@ interface Schema {
     layout?:        unknown;
     schema?:        SchemaNode;
 }
+interface LayoutItem {
+    key?:           string;
+    type?:          string;
+    notitle?:       boolean;
+    title?:         string;
+    description?:   string;
+    items?:         unknown;
+}
 interface SchemaNode {
+    title?:         string;
+    description?:   string;
     type?:          string;
     properties?:    Record<string, SchemaNode>;
     items?:         SchemaNode;
@@ -141,6 +151,29 @@ if (existsSync(join(root, indexRel)) && existsSync(join(root, serverRel))) {
         check(layout.includes(path),
               `config.schema.json: property "${path}" is not in the layout; add it as a `
             + '{ "key": "…", "type": "hidden" } entry if it should not be shown');
+    }
+}
+
+// A hidden layout entry suppresses the input control, but the form still
+// renders the title and description of the property behind it, which then
+// appear as loose text under the form. Silence both ends.
+{
+    const layoutItems = (schema.layout ?? []) as (string | LayoutItem)[];
+    const propertyAt = (path: string): SchemaNode | undefined =>
+        path.split('.').reduce<SchemaNode | undefined>(
+            (node, part) => node?.properties?.[part], schema.schema);
+
+    for (const item of layoutItems) {
+        if (typeof item === 'string' || item.type !== 'hidden' || !item.key) continue;
+        check(item.notitle === true,
+              `config.schema.json: hidden layout entry "${item.key}" needs "notitle": true, `
+            + 'or the form prints its label under the form');
+        check(!item.title && !item.description,
+              `config.schema.json: hidden layout entry "${item.key}" still carries title or description text`);
+        const property = propertyAt(item.key);
+        check(!property?.title && !property?.description,
+              `config.schema.json: property "${item.key}" is hidden but still has a title or `
+            + 'description, which the form renders as stray text');
     }
 }
 

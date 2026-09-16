@@ -17,14 +17,12 @@
                 "description": "Name shown in the Homebridge log."
             },
             "provisioningMethod": {
-                "title": "Provisioning Method",
                 "type": "string",
                 "default": "Remote Account",
                 "enum": [
                     "Remote Account",
                     "Mock Devices"
-                ],
-                "description": "Kept for round-tripping; the Dyson 360 Vis Nav only supports the cloud gateway. \"Mock Devices\" is a development mode set by hand in config.json."
+                ]
             },
             "dysonAccount": {
                 "type": "object",
@@ -33,24 +31,17 @@
                 },
                 "properties": {
                     "email": {
-                        "title": "Email Address",
-                        "type": "string",
-                        "description": "The email address used with the MyDyson app. Entered in the MyDyson Account box above."
+                        "type": "string"
                     },
                     "password": {
-                        "title": "Password",
-                        "type": "string",
-                        "description": "The password used with the MyDyson app. Entered in the MyDyson Account box above."
+                        "type": "string"
                     },
                     "china": {
-                        "title": "Account registered in China",
                         "type": "boolean",
                         "default": false
                     },
                     "token": {
-                        "title": "Authorisation Token",
-                        "type": "string",
-                        "description": "Optional. Only needed to supply a bearer token obtained elsewhere; the authorisation steps above store their token separately."
+                        "type": "string"
                     }
                 }
             },
@@ -213,23 +204,38 @@
         },
         {
             "key": "dysonAccount.email",
-            "type": "hidden"
+            "type": "hidden",
+            "notitle": true,
+            "title": "",
+            "description": ""
         },
         {
             "key": "dysonAccount.password",
-            "type": "hidden"
+            "type": "hidden",
+            "notitle": true,
+            "title": "",
+            "description": ""
         },
         {
             "key": "dysonAccount.china",
-            "type": "hidden"
+            "type": "hidden",
+            "notitle": true,
+            "title": "",
+            "description": ""
         },
         {
             "key": "dysonAccount.token",
-            "type": "hidden"
+            "type": "hidden",
+            "notitle": true,
+            "title": "",
+            "description": ""
         },
         {
             "key": "provisioningMethod",
-            "type": "hidden"
+            "type": "hidden",
+            "notitle": true,
+            "title": "",
+            "description": ""
         }
     ]
 }
