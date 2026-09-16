@@ -59,10 +59,10 @@ class DysonUiServer extends HomebridgePluginUiServer {
         const account = request?.account ?? {};
         const { email, password, china } = account;
         if (typeof email !== 'string' || !email.length) {
-            throw new RequestError('Enter the email address of your MyDyson account');
+            throw new RequestError('Enter the email address of your MyDyson account in the configuration form below, then try again.');
         }
         if (typeof password !== 'string' || !password.length) {
-            throw new RequestError('Enter the password of your MyDyson account');
+            throw new RequestError('Enter the password of your MyDyson account in the configuration form below, then try again.');
         }
         return { email, password, china: china === true };
     }

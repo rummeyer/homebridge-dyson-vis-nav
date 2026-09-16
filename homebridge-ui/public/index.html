@@ -1,7 +1,9 @@
 <style>
     .dyson-auth           { margin-bottom: 1.5rem; }
-    .dyson-auth h4        { margin-top: 1.25rem; }
-    .dyson-step           { padding: .75rem 1rem; border-left: 3px solid var(--bs-primary, #4b6cb7); margin-bottom: 1rem; }
+    .dyson-auth h4        { margin-top: 0; font-size: 1.05rem; }
+    .dyson-step           { padding: .75rem 1rem; border-left: 3px solid var(--bs-primary, #4b6cb7);
+                            margin-bottom: 1rem; }
+    .dyson-step.is-muted  { border-left-color: rgba(127,127,127,.4); opacity: .65; }
     .dyson-log            { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
                             font-size: .8rem; white-space: pre-wrap; word-break: break-word;
                             max-height: 14rem; overflow-y: auto; padding: .5rem; border-radius: .25rem;
@@ -11,25 +13,31 @@
 
 <div class="dyson-auth">
     <p>
-        Authorise access to your MyDyson account. Dyson emails a one-time code,
-        which is exchanged for a token stored alongside this plugin&rsquo;s data
-        &mdash; your password is not saved by this step.
+        Authorise access to your MyDyson account. There is nothing to do in the
+        MyDyson app itself &mdash; <strong>this page asks Dyson to email you a
+        one-time code</strong>, and exchanges it for a token stored alongside
+        this plugin&rsquo;s data. Your password is not saved by this step.
     </p>
 
-    <div class="dyson-step">
-        <h4>Step 1 &mdash; Request a code</h4>
-        <p class="text-muted mb-2">
-            Uses the email address and password entered in the
-            <strong>Plugin Config</strong> tab.
+    <div class="dyson-step" id="dysonStep1">
+        <h4>Step 1 &mdash; Enter your MyDyson credentials</h4>
+        <p class="text-muted mb-0">
+            Fill in <strong>Email Address</strong> and <strong>Password</strong> in the
+            configuration form <strong>below this box</strong>, then come back up here.
         </p>
+    </div>
+
+    <div class="dyson-step" id="dysonStep2">
+        <h4>Step 2 &mdash; Request a code</h4>
+        <p class="text-muted mb-2">Dyson sends an email titled &ldquo;Log in to your MyDyson App&rdquo;.</p>
         <button type="button" class="btn btn-primary" id="dysonStartAuth">Request code</button>
     </div>
 
-    <div class="dyson-step">
-        <h4>Step 2 &mdash; Enter the code</h4>
+    <div class="dyson-step" id="dysonStep3">
+        <h4>Step 3 &mdash; Enter the code from the email</h4>
         <div class="form-group">
-            <label for="dysonOtpCode">Code from the MyDyson email</label>
-            <input type="text" class="form-control" id="dysonOtpCode" autocomplete="one-time-code" placeholder="e.g. 123456">
+            <input type="text" class="form-control" id="dysonOtpCode"
+                   autocomplete="one-time-code" placeholder="e.g. 123456">
         </div>
         <button type="button" class="btn btn-primary" id="dysonFinishAuth">Submit code</button>
     </div>
@@ -43,6 +51,11 @@
     const $ = id => document.getElementById(id);
     const resultEl = $('dysonResult');
     const logEl    = $('dysonLog');
+
+    // Render the schema-generated configuration form below this custom UI.
+    // Without this the plugin's own settings — including the email address and
+    // password the steps above depend on — are never shown.
+    homebridge.showSchemaForm();
 
     // Show an outcome message, styled by severity
     const showResult = (message, kind) => {
@@ -60,7 +73,7 @@
         logEl.className = 'dyson-log';
     };
 
-    // Read the account details from the current (possibly unsaved) config
+    // Read the account details from the current (possibly unsaved) form state
     const getAccount = async () => {
         const configs = await homebridge.getPluginConfig();
         const account = configs[0]?.dysonAccount ?? {};
@@ -69,6 +82,12 @@
             password: account.password ?? '',
             china:    account.china === true
         };
+    };
+
+    // Grey out step 1 once credentials are present, so it is obvious what is left to do
+    const refreshSteps = async () => {
+        const { email, password } = await getAccount();
+        $('dysonStep1').classList.toggle('is-muted', Boolean(email && password));
     };
 
     // Issue a request to the plugin's UI server
@@ -85,6 +104,7 @@
         } finally {
             homebridge.hideSpinner();
             button.disabled = false;
+            await refreshSteps();
         }
     };
 
@@ -98,5 +118,7 @@
             otpCode: $('dysonOtpCode').value
         }, event.target);
     });
+
+    void refreshSteps();
 })();
 </script>

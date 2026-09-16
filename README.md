@@ -24,7 +24,7 @@ This plugin is not on the npm registry, so the Homebridge UI's plugin search wil
 2. On the Homebridge host, install the plugin into the same directory `hb-service` uses for plugins. On a standard `hb-service` install that is `<storage path>/node_modules`, with the storage path usually `/var/lib/homebridge`:
    ```
    sudo npm --prefix /var/lib/homebridge install \
-     https://github.com/rummeyer/homebridge-dyson-vis-nav/releases/download/v0.1.0/homebridge-dyson-vis-nav-0.1.0.tgz
+     https://github.com/rummeyer/homebridge-dyson-vis-nav/releases/download/v0.1.1/homebridge-dyson-vis-nav-0.1.1.tgz
    sudo hb-service restart
    ```
    The tarball is prebuilt, so the host needs neither git nor a TypeScript toolchain.
@@ -35,9 +35,9 @@ This plugin is not on the npm registry, so the Homebridge UI's plugin search wil
    ```
    sudo npm --prefix /var/lib/homebridge install github:rummeyer/homebridge-dyson-vis-nav
    ```
-3. Reload the Homebridge UI. The plugin appears under *Plugins*. In its settings, enter the email address and password of your MyDyson account.
-4. Open the **MyDyson Account** tab and click **Request code**. Dyson emails a one-time code.
-5. Enter the code and click **Submit code**.
+3. Reload the Homebridge UI. The plugin appears under *Plugins*. Open its settings: the MyDyson authorisation steps are shown at the top, with the configuration form directly below them.
+4. Fill in **Email Address** and **Password** in the form, then scroll up and click **Request code**. There is nothing to do in the MyDyson app itself — the plugin asks Dyson to send the email, which arrives titled "Log in to your MyDyson App".
+5. Enter the code from that email and click **Submit code**.
 6. Save the configuration and restart Homebridge.
 7. The robot is published as its **own Matter node**, not through the Homebridge bridge, so it has a **separate pairing code**. Find it in the Homebridge log (`📱 Commissioning codes for <name>`) and add it in the Home app with *Add Accessory → More options*.
 
