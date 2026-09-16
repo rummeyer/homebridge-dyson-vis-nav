@@ -226,31 +226,55 @@ each version, so this is not optional housekeeping.
 2. `npm run build && npm run lint`
 3. Commit, `git tag -a vX.Y.Z`, push both
 4. `npm pack`, then `gh release create vX.Y.Z <tarball> --title … --notes …`
-5. `npx --yes npm@latest publish`
+
+Creating the release publishes to npm by itself — see below.
 
 Attach the tarball to the GitHub release as well as publishing to npm: the
 release notes are a verification requirement, and a prebuilt tarball lets anyone
 install a specific version without npm. Write the notes for whoever hits the
 bug, not for the person who fixed it — symptom first, then cause.
 
-### Publishing needs care on this machine
+### Publishing
 
-The system `npm` is 8.5.0 from a Node 16 install, and prepending the npx Node 22
-directory to `PATH` swaps only `node` — the `node` package ships no `npm`. So use
-`npx --yes npm@latest` for both `login` and `publish`, with Node 22 on `PATH`
-because the publish runs `build && lint`:
+Publishing happens in GitHub Actions, not from a laptop. Creating the GitHub
+release triggers `.github/workflows/publish.yml`, which uses **npm trusted
+publishing**: GitHub mints a short-lived OIDC token for that run and npm accepts
+it instead of credentials. No token is stored anywhere, and no one-time password
+has to be typed.
+
+That last part is the reason it exists. This npm account is secured with a
+passkey, and a passkey cannot be presented from a terminal — a manual publish
+therefore needs a browser round trip, and the authentication URL is redacted as
+a secret in some terminals, including Claude Code's.
+
+**One-time setup on npmjs.com**, without which the workflow fails rather than
+falling back to anything weaker:
+
+1. npmjs.com → the package → **Settings** → **Trusted publisher**
+2. Provider **GitHub Actions**, organisation/user `rummeyer`,
+   repository `homebridge-dyson-vis-nav`, workflow `publish.yml`,
+   environment left blank
+
+The workflow refuses to publish when the release tag and `package.json` version
+disagree: the wrong version under the right name cannot be taken back.
+
+#### Publishing by hand, if it ever comes to that
+
+Run it in a plain terminal so the authentication URL is visible, and note that
+the system `npm` here is 8.5.0 from a Node 16 install — prepending the npx Node
+22 directory to `PATH` swaps only `node`, since the `node` package ships no
+`npm`:
 
 ```bash
 export PATH="$(ls -d ~/.npm/_npx/*/node_modules/node/bin | head -1):$PATH"
 npx --yes npm@latest publish
 ```
 
-npm asks for a one-time password. It offers a browser URL, but that URL is
-redacted in some terminals as a secret, so either run the publish in a plain
-terminal or pass `--otp=<code>` from an authenticator app.
+#### Why the build runs twice
 
-`prepublishOnly` and `prepare` both build, so a publish builds twice. That is
-deliberate: `prepare` is what makes a `github:` install work, and
-`prepublishOnly` is what guarantees lint passes before an upload. Reordering
-them to save the duplicate risks linting before the generated type checkers
-exist, which is a worse trade than a few seconds.
+`prepublishOnly` and `prepare` both build. That is deliberate: `prepare` is what
+makes a `github:` install work, and `prepublishOnly` is what guarantees lint
+passes before an upload. Reordering them to save the duplicate risks linting
+before the generated type checkers exist, which is a worse trade than a few
+seconds.
+
