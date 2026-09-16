@@ -216,7 +216,7 @@ Switch on **Enable debug logging**, reproduce the problem, and [open an issue](h
 
 Architecture, how to adopt upstream fixes, the build-time checks, running against
 a recorded session, and the Homebridge settings-UI pitfalls this project ran into
-are all in **[CONTRIBUTING.md](CONTRIBUTING.md)**.
+are all in **[CONTRIBUTING.md](https://github.com/rummeyer/homebridge-dyson-vis-nav/blob/main/CONTRIBUTING.md)**.
 
 ---
 
@@ -230,7 +230,7 @@ useful to you, please consider [sponsoring him](https://github.com/sponsors/thou
 
 ## Licence
 
-ISC — see [LICENSE](LICENSE).
+ISC — see [LICENSE](https://github.com/rummeyer/homebridge-dyson-vis-nav/blob/main/LICENSE).
 
 Dyson, Dyson 360 Vis Nav and MyDyson are trademarks of Dyson Technology Limited.
 This project is not affiliated with, endorsed by, or supported by Dyson. Apple,
