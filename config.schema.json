@@ -5,7 +5,7 @@
     "customUi": true,
     "customUiPath": "./homebridge-ui",
     "headerDisplay": "Exposes the Dyson 360 Vis Nav robot vacuum to Apple Home as a native Matter robot vacuum cleaner.\n\n**Matter must be enabled** in the Homebridge settings: a robot vacuum has no HomeKit (HAP) equivalent, so this plugin cannot work without it.",
-    "footerDisplay": "The MyDyson account fields and the one-time code are in the box above.",
+    "footerDisplay": "Mock devices for development are set directly in config.json; see the README.",
     "schema": {
         "type": "object",
         "properties": {
@@ -20,22 +20,11 @@
                 "title": "Provisioning Method",
                 "type": "string",
                 "default": "Remote Account",
-                "required": true,
-                "oneOf": [
-                    {
-                        "title": "Connect via AWS IoT gateway / Configure using MyDyson account",
-                        "enum": [
-                            "Remote Account"
-                        ]
-                    },
-                    {
-                        "title": "Mock devices (replay a recorded MQTT session, for development)",
-                        "enum": [
-                            "Mock Devices"
-                        ]
-                    }
+                "enum": [
+                    "Remote Account",
+                    "Mock Devices"
                 ],
-                "description": "The Dyson 360 Vis Nav does not accept local MQTT connections, so the cloud gateway is the only way to reach a real device."
+                "description": "Kept for round-tripping; the Dyson 360 Vis Nav only supports the cloud gateway. \"Mock Devices\" is a development mode set by hand in config.json."
             },
             "dysonAccount": {
                 "type": "object",
@@ -62,40 +51,6 @@
                         "title": "Authorisation Token",
                         "type": "string",
                         "description": "Optional. Only needed to supply a bearer token obtained elsewhere; the authorisation steps above store their token separately."
-                    }
-                }
-            },
-            "devices": {
-                "title": "Mock Devices",
-                "type": "array",
-                "condition": {
-                    "functionBody": "return model.provisioningMethod === 'Mock Devices';"
-                },
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "name": {
-                            "title": "Name",
-                            "type": "string",
-                            "required": true
-                        },
-                        "serialNumber": {
-                            "title": "Serial Number",
-                            "type": "string",
-                            "required": true
-                        },
-                        "rootTopic": {
-                            "title": "MQTT Root Topic",
-                            "type": "string",
-                            "default": "277",
-                            "required": true
-                        },
-                        "filename": {
-                            "title": "MQTT Log File",
-                            "type": "string",
-                            "required": true,
-                            "description": "Path to a recorded .jsonl MQTT session, e.g. the bundled mqtt-logs/277.jsonl."
-                        }
                     }
                 }
             },
@@ -180,35 +135,6 @@
     },
     "layout": [
         "name",
-        "provisioningMethod",
-        {
-            "type": "fieldset",
-            "title": "Mock Devices",
-            "expandable": true,
-            "condition": {
-                "functionBody": "return model.provisioningMethod === 'Mock Devices';"
-            },
-            "items": [
-                {
-                    "key": "devices",
-                    "type": "array",
-                    "title": "Mock Devices",
-                    "add": "Add device",
-                    "items": [
-                        {
-                            "type": "fieldset",
-                            "title": "Device",
-                            "items": [
-                                "devices[].name",
-                                "devices[].serialNumber",
-                                "devices[].rootTopic",
-                                "devices[].filename"
-                            ]
-                        }
-                    ]
-                }
-            ]
-        },
         {
             "type": "fieldset",
             "title": "Device Filtering",
@@ -248,8 +174,38 @@
                     "items": [
                         {
                             "key": "debugFeatures[]",
-                            "type": "string",
-                            "title": "Feature"
+                            "type": "select",
+                            "title": "Feature",
+                            "titleMap": [
+                                {
+                                    "value": "Log API Headers",
+                                    "name": "Log API Headers"
+                                },
+                                {
+                                    "value": "Log API Bodies",
+                                    "name": "Log API Bodies"
+                                },
+                                {
+                                    "value": "Log MQTT Client",
+                                    "name": "Log MQTT Client"
+                                },
+                                {
+                                    "value": "Log MQTT Payloads",
+                                    "name": "Log MQTT Payloads"
+                                },
+                                {
+                                    "value": "Log MQTT Payloads as JSON",
+                                    "name": "Log MQTT Payloads as JSON"
+                                },
+                                {
+                                    "value": "Log Serial Numbers",
+                                    "name": "Log Serial Numbers"
+                                },
+                                {
+                                    "value": "Log Debug as Info",
+                                    "name": "Log Debug as Info"
+                                }
+                            ]
                         }
                     ]
                 }
@@ -269,6 +225,10 @@
         },
         {
             "key": "dysonAccount.token",
+            "type": "hidden"
+        },
+        {
+            "key": "provisioningMethod",
             "type": "hidden"
         }
     ]

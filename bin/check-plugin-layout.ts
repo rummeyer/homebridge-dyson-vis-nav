@@ -30,6 +30,13 @@ interface Schema {
     customUiPath?:  string;
     singular?:      boolean;
     pluginAlias?:   string;
+    layout?:        unknown;
+    schema?:        SchemaNode;
+}
+interface SchemaNode {
+    type?:          string;
+    properties?:    Record<string, SchemaNode>;
+    items?:         SchemaNode;
 }
 interface PackageJson {
     files?:             string[];
@@ -107,6 +114,33 @@ if (existsSync(join(root, indexRel)) && existsSync(join(root, serverRel))) {
     for (const path of paths) {
         check(server.includes(`onRequest('${path}'`),
               `${indexRel} requests "${path}", which ${serverRel} does not serve`);
+    }
+}
+
+// Every schema property must appear in the layout, hidden if it has no place
+// on the form. Properties the layout omits still enter the form model and are
+// validated there, so one the user cannot reach can leave the form permanently
+// invalid — which surfaces only as "config validation failed" next to Save,
+// naming nothing.
+{
+    // Object properties nest, and a nested one is just as able to hold the form
+    // invalid as a top-level one, so walk the whole tree. Array items are the
+    // layout's business rather than the model's, so they are not followed.
+    const paths: string[] = [];
+    const walk = (node: SchemaNode, prefix: string): void => {
+        for (const [name, child] of Object.entries(node.properties ?? {})) {
+            const path = prefix ? `${prefix}.${name}` : name;
+            paths.push(path);
+            if (child.properties) walk(child, path);
+        }
+    };
+    walk(schema.schema ?? {}, '');
+
+    const layout = JSON.stringify(schema.layout ?? []);
+    for (const path of paths) {
+        check(layout.includes(path),
+              `config.schema.json: property "${path}" is not in the layout; add it as a `
+            + '{ "key": "…", "type": "hidden" } entry if it should not be shown');
     }
 }
 

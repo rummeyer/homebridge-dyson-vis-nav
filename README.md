@@ -91,7 +91,9 @@ Most settings have sensible defaults. The full set:
 
 ### Testing without hardware
 
-`mqtt-logs/277.jsonl` is a recorded Vis Nav MQTT session (from the upstream project's regression tests). With `provisioningMethod` set to `Mock Devices` the plugin replays it, which exercises the full state machine without a device or a MyDyson account:
+`mqtt-logs/277.jsonl` is a recorded Vis Nav MQTT session (from the upstream project's regression tests). With `provisioningMethod` set to `Mock Devices` the plugin replays it, which exercises the full state machine without a device or a MyDyson account.
+
+This is a development path and is **not offered in the settings UI**: it has to be written into `config.json` by hand, and saving from the UI afterwards will drop the `devices` block, since the form does not know it.
 
 ```json
 {
