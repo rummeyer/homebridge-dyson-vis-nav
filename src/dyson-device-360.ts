@@ -37,6 +37,7 @@ export class DysonDevice360VisNav extends DysonDevice360ZonesMixin(DysonDevice36
 
     override setPowerLevel = (powerLevel: Dyson360CleaningStrategy) => this.mqtt.commandSetCleaningStrategy(powerLevel);
     override getPowerLevel = () => this.mqtt.status.defaultCleaningStrategy;
+    override getCurrentPowerLevel = () => this.mqtt.status.currentCleaningStrategy;
 
     // Retrieve details of a completed clean
     override async getCompletedClean(cleanId: string): Promise<Dyson360CleanSummaryResult> {

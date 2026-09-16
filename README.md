@@ -1,104 +1,215 @@
-# homebridge-dyson-vis-nav
+<p align="center">
+  <img src="https://raw.githubusercontent.com/homebridge/branding/latest/logos/homebridge-color-round-stylized.png" height="140">
+</p>
 
-A [Homebridge](https://homebridge.io) plugin that exposes the **Dyson 360 Vis Nav** robot vacuum to Apple Home as a **native Matter robot vacuum cleaner**, via Dyson's AWS IoT MQTT gateway.
+<h1 align="center">homebridge-dyson-vis-nav</h1>
 
-This is a port of [`matterbridge-dyson-robot`](https://github.com/thoukydides/matterbridge-dyson-robot) by Alexander Thoukydides, narrowed to the 360 Vis Nav and rebuilt on Homebridge 2.0's Matter support.
+<p align="center">
+  Control your <b>Dyson 360 Vis Nav</b> from the Apple Home app &mdash; as a real robot vacuum, not a switch in disguise.
+</p>
 
-## Requirements
+<p align="center">
+  <a href="https://github.com/rummeyer/homebridge-dyson-vis-nav/releases"><img src="https://img.shields.io/github/v/release/rummeyer/homebridge-dyson-vis-nav?label=release" alt="Release"></a>
+  <a href="https://github.com/rummeyer/homebridge-dyson-vis-nav/blob/main/LICENSE"><img src="https://img.shields.io/badge/licence-ISC-blue" alt="Licence"></a>
+  <img src="https://img.shields.io/badge/homebridge-%E2%89%A5%202.4.0-purple" alt="Homebridge 2.4.0+">
+  <img src="https://img.shields.io/badge/node-22%20%7C%2024%20%7C%2026-green" alt="Node 22, 24 or 26">
+</p>
+
+---
+
+## What you get
+
+Your robot appears in the Home app as a genuine **robot vacuum cleaner**, with the controls Apple provides for that device type:
+
+- **Start, pause, resume and stop** a clean
+- **Send it back to the dock**
+- **Choose a cleaning mode** — Auto, Quick, Quiet or Max
+- **Battery level**, charging state and low-battery warning
+- **What it is doing right now** — cleaning, paused, heading for the dock, charging, docked
+- **Problems, in plain language** — bin full or missing, stuck, wheels jammed, sensor obscured, and more
+- **Room cleaning**, for the rooms you have mapped in the MyDyson app
+- **Siri**: *"Hey Siri, start the vacuum"*, *"Hey Siri, send the vacuum to its dock"*
+
+Everything runs through your own Homebridge. Nothing is sent anywhere except to Dyson, exactly as the MyDyson app does.
+
+## Before you start
 
 | | |
 |---|---|
-| Homebridge | 2.4.0 or later |
-| Node.js | 22, 24 or 26 |
-| Matter | **must be enabled** in the Homebridge settings |
-| Device | Dyson 360 Vis Nav (RB03, MQTT root topic `277`) |
-| Account | a MyDyson account with the robot added |
+| **Robot** | Dyson 360 Vis Nav, added to your MyDyson account |
+| **Homebridge** | 2.4.0 or newer |
+| **Node.js** | 22, 24 or 26 |
+| **Matter** | **Must be enabled in Homebridge** — see step 1 |
+| **Apple Home** | iOS 18.4 / iPadOS 18.4 / tvOS 18.4 or newer, on every device that should control it |
 
-**Matter is not optional.** HomeKit's own accessory protocol (HAP) has no robot vacuum service — Apple added robot vacuums to the Home app through Matter only. Without Matter enabled this plugin logs an error and does nothing.
+### Why Matter has to be on
 
-## Installation
+Apple never added robot vacuums to HomeKit itself. It added them to the Home app **through Matter**, which is why this plugin needs it. With Matter switched off, the plugin cannot expose your robot at all, and says so in the log rather than pretending otherwise.
 
-This plugin is not on the npm registry, so the Homebridge UI's plugin search will not find it. Install it from a release tarball instead.
+Homebridge 2.0 speaks Matter alongside HomeKit, so switching it on costs you nothing: your other accessories carry on exactly as before.
 
-1. Enable Matter in Homebridge (Settings → Matter), then restart Homebridge.
-2. On the Homebridge host, install the plugin into the same directory `hb-service` uses for plugins. On a standard `hb-service` install that is `<storage path>/node_modules`, with the storage path usually `/var/lib/homebridge`:
+---
+
+## Step 1 — Turn on Matter in Homebridge
+
+1. Open the Homebridge UI.
+2. Go to **Settings** (the gear icon, top right).
+3. Find **Matter** and switch it on.
+4. Click **Save**, then **Restart Homebridge**.
+
+## Step 2 — Install the plugin
+
+Open the Homebridge UI, go to **Plugins**, search for `homebridge-dyson-vis-nav`, and click **Install**.
+
+<details>
+<summary><b>Not on npm yet — use this instead</b></summary>
+
+Until the plugin is published to npm, the Homebridge UI's search will not find it. Install a release build over SSH instead:
+
+```bash
+sudo npm --prefix /var/lib/homebridge install \
+  https://github.com/rummeyer/homebridge-dyson-vis-nav/releases/download/v0.2.5/homebridge-dyson-vis-nav-0.2.5.tgz
+sudo hb-service restart
+```
+
+`/var/lib/homebridge` is the usual Homebridge storage path; if yours differs, the Homebridge UI shows it under **Settings**. The download is prebuilt, so your Homebridge machine needs no build tools.
+
+Note that `hb-service add` does **not** work with a URL — it only accepts plugin names from npm.
+</details>
+
+## Step 3 — Connect your MyDyson account
+
+1. In the Homebridge UI, open the plugin's **Settings**.
+2. In the **MyDyson Account** box at the top, enter the **email address** and **password** you use with the MyDyson app.
+3. Click **Request code**.
+
+   There is nothing to do in the MyDyson app itself. Dyson sends you an email titled **"Log in to your MyDyson App"** containing a short code. Check your spam folder if it does not turn up within a minute.
+
+4. Type that code into **Auth code** and click **Submit**.
+
+   The box collapses to **✓ Authorised** once it works, and shows how many devices were found in your account.
+
+5. Click **Save**, then **Restart Homebridge**.
+
+> **Your password is not stored.** It is used once to obtain an access token from Dyson; only that token is kept, alongside the plugin's own data. The plugin checks the token whenever you open the settings, and offers a new code by itself if Dyson has stopped accepting it.
+
+## Step 4 — Add the robot to the Home app
+
+The robot is **not** part of the Homebridge bridge you have already paired. Apple does not accept bridged robot vacuums, so Homebridge publishes it as a device of its own, with its own pairing code.
+
+1. In the Homebridge log, look for a block like:
+
    ```
-   sudo npm --prefix /var/lib/homebridge install \
-     https://github.com/rummeyer/homebridge-dyson-vis-nav/releases/download/v0.2.0/homebridge-dyson-vis-nav-0.2.0.tgz
-   sudo hb-service restart
+   📱 Commissioning codes for Dyson 360 Vis Nav:
+      Manual Pairing Code: 1234-567-8901
    ```
-   The tarball is prebuilt, so the host needs neither git nor a TypeScript toolchain.
 
-   > `sudo hb-service add homebridge-dyson-vis-nav` does **not** work: it validates its argument as an npm plugin name and rejects URLs and file paths.
+   You can also find it in the Homebridge UI under **Matter**.
 
-   To install from source instead — this needs git and builds on the host:
-   ```
-   sudo npm --prefix /var/lib/homebridge install github:rummeyer/homebridge-dyson-vis-nav
-   ```
-3. Reload the Homebridge UI. The plugin appears under *Plugins*. Its settings open with a **MyDyson Account** box at the top, and the rest of the configuration below it.
-4. Enter your email address and password, then click **Request code**. There is nothing to do in the MyDyson app itself — the plugin asks Dyson to send the email, which arrives titled "Log in to your MyDyson App".
-5. Put the code from that email in **Auth code** and click **Submit**.
-6. Save the configuration and restart Homebridge.
-7. The robot is published as its **own Matter node**, not through the Homebridge bridge, so it has a **separate pairing code**. Find it in the Homebridge log (`📱 Commissioning codes for <name>`) and add it in the Home app with *Add Accessory → More options*.
+2. In the **Home app**: **+** → **Add Accessory** → **More options…**
+3. Pick your robot from the list, or enter the pairing code by hand.
+4. Choose a room and a name, and you are done.
 
-Step 7 is not a quirk of this plugin: Apple Home does not accept bridged robot vacuums, so Homebridge publishes them as standalone nodes automatically.
+---
 
-## Why cloud-only
+## Everyday use
 
-The 360 Vis Nav does not accept local MQTT connections, unlike the older 360 Eye and 360 Heurist. Dyson's AWS IoT gateway is the only way to reach it, so the local provisioning methods offered by the Matterbridge original are not implemented here. Your password is used once to obtain a bearer token; the token is stored in the plugin's own `node-persist` store, not in `config.json`.
+**Where the controls are.** Tap the tile to open the robot; the cleaning modes sit above the **Start** button. The tile itself only starts and stops.
 
-## What you get in Apple Home
+**Cleaning modes.** Auto, Quick, Quiet and Max mirror the modes in the MyDyson app. Choosing one here sets the robot's **default** mode, the same setting the MyDyson app shows.
 
-| Feature | Status |
-|---|---|
-| Start / stop / pause / resume | ✅ |
-| Return to dock | ✅ |
-| Cleaning mode (Auto, Quick, Quiet, Boost) | ✅ |
-| Battery level, charging state, low-battery warning | ✅ |
-| Activity state (Running, Paused, Seeking charger, Charging, Docked) | ✅ |
-| Fault reporting (bin missing/full, stuck, wheels jammed, …) | ✅ |
-| Zone cleaning | ✅ (Vis Nav only feature; zone list comes from the MyDyson account) |
-| Clean map rendered into the log | ✅ (optional, see `logMapStyle`) |
+**Rooms with their own setting.** In the MyDyson app you can give an individual room its own cleaning strategy. Those settings live in Dyson's cloud and this plugin never changes them — so a room set to Max keeps cleaning at Max even when the default is Quick. While a clean is running, the Home app shows the mode the robot is **actually** using, not the default.
 
-### When the robot is unreachable
+**When the robot is out of reach.** If it stops responding — off its dock in a dead spot, or the network is down — the plugin keeps showing the last state it saw for a couple of minutes, so a brief dropout does not make the tile flicker. After that it reports the robot's activity as unknown rather than claiming it is still cleaning. The wait is adjustable (**Unreachable Timeout**).
 
-The robot is marked unreachable a few seconds after it stops responding, and its
-activity is reported as unknown once `unreachableTimeout` (120 s by default)
-elapses. Without that, the last state seen would stand indefinitely — a robot
-that vanished mid-clean would keep showing as cleaning.
+---
 
-### Known limitations
+## Settings
 
-- **No Matter cluster events.** Homebridge 2.4.0 exposes no API for emitting them, so the `OperationalError`, `OperationCompletion`, `BatFaultChange` and `BatChargeFaultChange` events of the Matterbridge original are written to the log instead. The corresponding *attributes* are updated normally, and those are what the Home app reads — so this is not visible in day-to-day use.
-- **Some device metadata is not exposed.** Homebridge's Matter accessory descriptor has no fields for vendor ID, product ID, product appearance or product URL. They are logged at debug level instead.
-- **Battery charge faults are log-only.** Homebridge's `powerSource` cluster state has `activeBatFaults` but not `activeBatChargeFaults`.
+Everything below has a sensible default; you can ignore all of it.
 
-## Configuration
-
-Most settings have sensible defaults. The full set:
-
-| Option | Default | Meaning |
+| Setting | Default | What it does |
 |---|---|---|
-| `provisioningMethod` | `Remote Account` | `Remote Account` for a real device, `Mock Devices` to replay a recorded session |
-| `dysonAccount.email` / `.password` | — | MyDyson credentials |
-| `dysonAccount.china` | `false` | Set for accounts registered in China |
-| `whiteList` | `[]` | Only these serial numbers are exposed; empty exposes every robot in the account |
-| `simpleModeTagsRvc` | `true` | Advertise one descriptive mode tag per cleaning mode instead of the full set |
-| `wildcardTopic` | `false` | Subscribe to all MQTT topics — useful when capturing logs for a bug report |
-| `logMapStyle` | `Off` | Render a map of each completed clean into the log |
-| `unreachableTimeout` | `120` | Seconds the robot may stay silent before Apple Home is told its activity is unknown |
-| `debug` / `debugFeatures` | `false` / `[]` | Diagnostic logging |
+| **Name** | Dyson 360 Vis Nav | The name shown in the Homebridge log |
+| **Serial Number Allow List** | empty | Leave empty to add every robot vacuum in your account. Add serial numbers to pick specific ones |
+| **Use simple RVC Clean Mode tags** | on | Describes each cleaning mode with one tag instead of several. Turn off only if your controller needs the full set |
+| **Subscribe to wildcard MQTT topic** | off | Listens to everything the robot publishes. Useful when capturing a log for a bug report |
+| **Clean Map Logging** | Off | Draws a map of each finished clean into the Homebridge log |
+| **Unreachable Timeout** | 120 s | How long the robot may stay silent before the Home app is told its activity is unknown |
+| **Enable debug logging** | off | Much more detail in the log |
+| **Debug Features** | none | Individual extras — API headers and bodies, MQTT payloads. Turn these on only when asked to |
 
-### Testing without hardware
-
-`mqtt-logs/277.jsonl` is a recorded Vis Nav MQTT session (from the upstream project's regression tests). With `provisioningMethod` set to `Mock Devices` the plugin replays it, which exercises the full state machine without a device or a MyDyson account.
-
-This is a development path and is **not offered in the settings UI**: it has to be written into `config.json` by hand, and saving from the UI afterwards will drop the `devices` block, since the form does not know it.
+<details>
+<summary>Editing <code>config.json</code> directly</summary>
 
 ```json
 {
     "platform": "DysonVisNav",
     "name": "Dyson 360 Vis Nav",
+    "provisioningMethod": "Remote Account",
+    "dysonAccount": {
+        "email": "you@example.com",
+        "password": "your-mydyson-password",
+        "china": false
+    },
+    "whiteList": [],
+    "unreachableTimeout": 120,
+    "debug": false
+}
+```
+
+Set `"china": true` if your MyDyson account is registered in China.
+</details>
+
+---
+
+## If something goes wrong
+
+**The plugin logs an error about Matter and stops.**
+Matter is not switched on. Go back to step 1. A robot vacuum has no HomeKit equivalent, so there is nothing the plugin can do without it.
+
+**The robot does not appear in the Home app.**
+It has its own pairing code and is not part of your Homebridge bridge — see step 4. Adding the Homebridge bridge again will not bring it in.
+
+**No email arrives after *Request code*.**
+Check your spam folder, and that the email address matches your MyDyson account exactly. If the settings page shows a red message, its wording says whether Dyson refused the request or the plugin failed before reaching them.
+
+**"Too many requests" when requesting a code.**
+Dyson rate-limits this. Your earlier request is still valid — use the code from the most recent email rather than asking for another.
+
+**The tile says the robot is cleaning when it is not.**
+It stopped responding while cleaning. After **Unreachable Timeout** the plugin reports its activity as unknown. Lower the value if two minutes feels long.
+
+**It cleans at full power even though a gentler mode is set.**
+A room can carry its own cleaning strategy, set in the MyDyson app, which overrides the default for that room. Change it there.
+
+**Anything else.**
+Switch on **Enable debug logging**, reproduce the problem, and [open an issue](https://github.com/rummeyer/homebridge-dyson-vis-nav/issues) with the log. If it concerns the robot's behaviour rather than the plugin's, add **Log MQTT Payloads as JSON** under Debug Features — that is what makes such reports diagnosable.
+
+---
+
+## Good to know
+
+**Cloud only.** Unlike the older 360 Eye and 360 Heurist, the Vis Nav does not accept local connections. Everything goes through Dyson's gateway, the same route the MyDyson app takes, so the robot needs internet access and so does Homebridge.
+
+**Matter events are not sent.** Homebridge 2.4.0 has no way to emit them, so error and completion events are written to the log instead. The matching *attributes* are updated normally, and those are what the Home app reads — so you will not notice this in use.
+
+**Reachability.** Matter carries this on a cluster that Homebridge's plugin API cannot address, so an unresponsive robot is conveyed through its operational state instead, as described above.
+
+---
+
+## For developers
+
+<details>
+<summary>Running without hardware, and tracking upstream</summary>
+
+### Mock devices
+
+`mqtt-logs/277.jsonl` is a recorded Vis Nav session. Replaying it exercises the whole state machine with no robot and no MyDyson account. It is a development path and deliberately absent from the settings UI, so write it into `config.json` by hand — and note that saving from the UI afterwards drops the `devices` block, since the form does not know it:
+
+```json
+{
+    "platform": "DysonVisNav",
     "provisioningMethod": "Mock Devices",
     "devices": [{
         "name": "Vis Nav Test",
@@ -109,36 +220,45 @@ This is a development path and is **not offered in the settings UI**: it has to 
 }
 ```
 
-## Development status
+### Taking fixes from upstream
 
-The Dyson protocol layer — cloud API, MQTT client, message parsing, state and fault mapping, zone handling — is ported essentially unchanged from `matterbridge-dyson-robot`, which is validated against physical devices.
-
-The Matter layer is new. It has been verified end-to-end against Homebridge 2.4.0 with the recorded session above: the accessory publishes as a standalone Matter node and all five clusters (`rvcRunMode`, `rvcCleanMode`, `rvcOperationalState`, `serviceArea`, `powerSource`) track the device through cleaning, docking, charging and fault states. It has **not** yet been tested against a physical Vis Nav, nor paired with the Apple Home app.
-
-## Adopting upstream fixes
-
-The Dyson protocol layer was copied from
+The Dyson protocol layer comes from
 [`matterbridge-dyson-robot`](https://github.com/thoukydides/matterbridge-dyson-robot)
-with only its import paths rewritten, so upstream fixes can be taken almost
-verbatim. `.upstream.json` records the revision this port is based on, and:
+with only its import paths rewritten, so upstream fixes apply almost verbatim.
+`.upstream.json` records the revision this port is based on.
 
 ```
-npm run upstream                 # what changed since, against the latest tag
+npm run upstream                  # what changed since the baseline
+npm run upstream -- --apply       # take the files this port has not touched
 npm run upstream -- --ref v1.12.0
-npm run upstream -- --apply      # take the files this port has not touched
 ```
 
-Files are sorted into two groups: those still byte-identical to upstream after
-rewriting, which `--apply` updates wholesale, and those this port has since
-changed, which are listed with the command to inspect the upstream diff. The
-baseline is only moved by hand, once the result builds and passes its checks.
+Files still identical to upstream after rewriting are replaced wholesale; files this port has changed are listed with the command to inspect the upstream diff.
+
+### Checks
+
+`npm run build` runs three checks beyond the compiler, covering the parts of a
+Homebridge plugin that no compiler or linter can see: the flags and file layout
+the settings UI requires, that the custom UI's config provides everything the
+Dyson client reads, and that the custom UI's server actually starts. Each was
+written against a bug that had already reached a user.
+
+</details>
+
+---
 
 ## Credits
 
-Practically all of the hard work — reverse-engineering Dyson's cloud API and MQTT protocol — is Alexander Thoukydides'. This port reuses it under the ISC licence. If this plugin is useful to you, consider [sponsoring the original author](https://github.com/sponsors/thoukydides).
+The hard part — reverse-engineering Dyson's cloud API and MQTT protocol — is the
+work of [Alexander Thoukydides](https://github.com/thoukydides) in
+[`matterbridge-dyson-robot`](https://github.com/thoukydides/matterbridge-dyson-robot).
+This plugin carries that work over to Homebridge under the ISC licence. If it is
+useful to you, please consider [sponsoring him](https://github.com/sponsors/thoukydides).
 
 ## Licence
 
-ISC. See [LICENSE](LICENSE).
+ISC — see [LICENSE](LICENSE).
 
-Dyson, Dyson 360 Vis Nav and MyDyson are trademarks of Dyson Technology Limited. This project is not affiliated with, endorsed by, or supported by Dyson.
+Dyson, Dyson 360 Vis Nav and MyDyson are trademarks of Dyson Technology Limited.
+This project is not affiliated with, endorsed by, or supported by Dyson. Apple,
+HomeKit, Siri and Apple Home are trademarks of Apple Inc.

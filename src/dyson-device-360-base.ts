@@ -238,6 +238,10 @@ export abstract class DysonDevice360Base
     abstract setPowerLevel(powerLevel: Dyson360PowerLevel): Promise<void>;
     abstract getPowerLevel(): Dyson360PowerLevel | undefined;
 
+    // The power level a clean is actually running at, for models that report one
+    // separately from their configured default. Undefined means not reported.
+    getCurrentPowerLevel(): Dyson360PowerLevel | undefined { return undefined; }
+
     // Retrieve details of a completed clean
     getCompletedClean(_cleanId: string): MaybePromise<Dyson360CleanSummaryResult> { return {}; }
 
@@ -298,6 +302,30 @@ export abstract class DysonDevice360Base
         };
     }
 
+    // The power level to report in the RVC Clean Mode cluster.
+    //
+    // While cleaning, report what is actually running rather than the configured
+    // default: the Vis Nav lets a zone carry its own cleaning strategy, so a
+    // clean can run at a level the default never mentions, and reporting the
+    // default would have the accessory claim a mode the robot is not using.
+    // Outside a clean there is nothing running, so the default is what applies
+    // next, and it is also what a mode change writes.
+    reportedPowerLevel(status: DysonMqttStatus<DysonMqttStatus360>): Dyson360PowerLevel | undefined {
+        const { runMode } = mapState(status.state);
+        if (runMode !== RvcRunMode360.Idle) {
+            const current = this.getCurrentPowerLevel();
+            // Ignore a level the cluster does not advertise; it has no mode to map to
+            if (current !== undefined && this.getPowerLevelMaps().some(([level]) => level === current)) {
+                if (current !== this.getPowerLevel()) {
+                    this.log.debug(`Running at ${current}, which differs from the default`
+                                 + ` ${this.getPowerLevel() ?? 'unknown'}`);
+                }
+                return current;
+            }
+        }
+        return this.getPowerLevel();
+    }
+
     // Map a Dyson power mode to its corresponding RVC Clean Mode
     powerModeToCleanMode(powerMode?: string | number): RvcCleanMode360 {
         const map = this.getPowerLevelMaps().find(([m]) => m === powerMode);
@@ -315,7 +343,7 @@ export abstract class DysonDevice360Base
 
         // Map the state to cluster attribute values
         const faults = mapDyson360Faults(this.log, status.state, status.faults, status.activeFaults);
-        const cleanMode         = this.powerModeToCleanMode(this.getPowerLevel());
+        const cleanMode         = this.powerModeToCleanMode(this.reportedPowerLevel(status));
         const { runMode }       = mapState(status.state);
         const operationalState  = this.mapOperationalState(status, faults);
         const batteryStatus     = this.mapBatteryStatus(status, faults);

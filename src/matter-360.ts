@@ -304,14 +304,19 @@ export class MatterAccessory360 {
 
     // Update the reachability of the device.
     //
-    // A robot vacuum is published as its own Matter node rather than as a
-    // bridged device, so this goes on the node's Basic Information cluster
-    // rather than a Bridged Device Basic Information one. Controllers use it to
-    // show that the accessory is not responding.
+    // Matter expresses this on the Basic Information cluster, but that lives on
+    // the node rather than on the device endpoint, and Homebridge's
+    // updateAccessoryState only addresses the endpoint — writing it there fails
+    // with "Behavior basicInformation is not present on this endpoint". Nothing
+    // in the Matter API reaches the node, so this is logged and no more.
+    //
+    // Controllers are told instead through the operational state: once the robot
+    // has been silent for longer than the configured timeout, its activity is
+    // reported as unknown rather than left at whatever was last seen.
     @ifValueChanged
-    async updateReachable(reachable: boolean): Promise<void> {
+    updateReachable(reachable: boolean): Promise<void> {
         this.log.info(`${AN}Reachable${RI}: ${AV}${reachable}${RI}`);
-        await this.updateState('basicInformation', { reachable });
+        return Promise.resolve();
     }
 
     // Update the Power Source cluster attributes when required
