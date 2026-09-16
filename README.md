@@ -24,7 +24,7 @@ This plugin is not on the npm registry, so the Homebridge UI's plugin search wil
 2. On the Homebridge host, install the plugin into the same directory `hb-service` uses for plugins. On a standard `hb-service` install that is `<storage path>/node_modules`, with the storage path usually `/var/lib/homebridge`:
    ```
    sudo npm --prefix /var/lib/homebridge install \
-     https://github.com/rummeyer/homebridge-dyson-vis-nav/releases/download/v0.1.2/homebridge-dyson-vis-nav-0.1.2.tgz
+     https://github.com/rummeyer/homebridge-dyson-vis-nav/releases/download/v0.1.3/homebridge-dyson-vis-nav-0.1.3.tgz
    sudo hb-service restart
    ```
    The tarball is prebuilt, so the host needs neither git nor a TypeScript toolchain.

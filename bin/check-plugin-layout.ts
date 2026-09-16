@@ -17,8 +17,8 @@
 //                                platform plugins
 //   - files[] covers the UI      npm must actually ship homebridge-ui/
 
-import { readFileSync } from 'fs';
-import { existsSync } from 'fs';
+import { builtinModules } from 'module';
+import { existsSync, readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
 
@@ -32,8 +32,10 @@ interface Schema {
     pluginAlias?:   string;
 }
 interface PackageJson {
-    files?:         string[];
-    main?:          string;
+    files?:             string[];
+    main?:              string;
+    dependencies?:      Record<string, string>;
+    devDependencies?:   Record<string, string>;
 }
 
 const failures: string[] = [];
@@ -68,6 +70,32 @@ if (existsSync(join(root, indexRel))) {
 
 check(schema.singular === true,
       'config.schema.json: "singular": true is required for showSchemaForm() to work');
+
+// Everything the custom UI's server.js imports runs on the user's machine, so
+// each bare specifier must be a runtime dependency. A devDependency resolves
+// fine here but is absent after `npm install`, and the failure is invisible:
+// the server process dies on the import, never calls ready(), and the settings
+// page spins forever with no error anywhere.
+const serverRel = join(uiDir, 'server.js');
+if (existsSync(join(root, serverRel))) {
+    const runtimeDeps = new Set(Object.keys(pkg.dependencies ?? {}));
+    const devDeps     = new Set(Object.keys(pkg.devDependencies ?? {}));
+    const builtins    = new Set(builtinModules);
+    const imports     = [...read(serverRel).matchAll(/^import\s[^'"]*from\s*'([^']+)'/gm)]
+        .map(m => m[1])
+        .filter(spec => !spec.startsWith('.'));
+
+    for (const spec of imports) {
+        const pkgName = spec.startsWith('@')
+            ? spec.split('/').slice(0, 2).join('/')
+            : spec.split('/')[0];
+        if (builtins.has(pkgName) || pkgName.startsWith('node:')) continue;
+        check(runtimeDeps.has(pkgName),
+              `${serverRel} imports "${pkgName}", which is ${devDeps.has(pkgName)
+                  ? 'a devDependency' : 'not declared'} — it must be in "dependencies", `
+            + 'or the custom UI server crashes on load and the settings page hangs on a spinner');
+    }
+}
 
 const files = pkg.files ?? [];
 const covers = (entry: string): boolean =>
