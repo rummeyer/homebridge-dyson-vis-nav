@@ -187,6 +187,13 @@ export class DysonCloudAuth extends DysonCloud {
             throw new Error(`No authorisation challenge found for ${email}`);
         }
 
+        // The password is optional in the configuration, because it is not
+        // needed once an account holds a token; completing an authorisation is
+        // the one place it is required.
+        if (password === undefined) {
+            throw new Error('A password is required to complete authorisation');
+        }
+
         // Attempt to complete authorisation
         const { challengeId } = challenge;
         this.log.debug(`Completing authorisation for ${email}: ${challengeId}`);

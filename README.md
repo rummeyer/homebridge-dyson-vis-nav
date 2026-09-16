@@ -68,7 +68,7 @@ Until the plugin is published to npm, the Homebridge UI's search will not find i
 
 ```bash
 sudo npm --prefix /var/lib/homebridge install \
-  https://github.com/rummeyer/homebridge-dyson-vis-nav/releases/download/v0.2.5/homebridge-dyson-vis-nav-0.2.5.tgz
+  https://github.com/rummeyer/homebridge-dyson-vis-nav/releases/download/v0.3.0/homebridge-dyson-vis-nav-0.3.0.tgz
 sudo hb-service restart
 ```
 
@@ -91,7 +91,21 @@ Note that `hb-service add` does **not** work with a URL — it only accepts plug
 
 5. Click **Save**, then **Restart Homebridge**.
 
-> **Your password is not stored.** It is used once to obtain an access token from Dyson; only that token is kept, alongside the plugin's own data. The plugin checks the token whenever you open the settings, and offers a new code by itself if Dyson has stopped accepting it.
+### What is stored, and where
+
+| | |
+|---|---|
+| **Email address, password** | Homebridge's `config.json`, **in plain text** |
+| **Access token** | the plugin's own storage, under the Homebridge storage path |
+
+Credentials in `config.json` are normal for Homebridge plugins, but worth knowing: anything that can read your Homebridge configuration — including a configuration backup — can read that password.
+
+Your password is used **only** to exchange the emailed code for an access token. From then on the plugin authenticates with the token and never reads the password again, so you can remove it:
+
+- Once the box shows **✓ Authorised**, click **Forget password**, then **Save**.
+- The plugin carries on working. Enter the password again only if you need to authorise afresh, for instance after Dyson revokes the token.
+
+The plugin checks the token whenever you open the settings, and offers a new code by itself if Dyson has stopped accepting it.
 
 ## Step 4 — Add the robot to the Home app
 

@@ -14,13 +14,16 @@ export type ProvisioningMethod =
 // Dyson account configuration
 export interface DysonAccountBase {
     china:                  boolean;
-    // Dummy values corresponding to action buttons
-    finishAuth?:            boolean,
-    startAuth?:             boolean
 }
+
+// The password is needed only to exchange the emailed code for a token, and the
+// token is held in the plugin's own storage keyed by email address. So once an
+// account is authorised the password may be removed from the configuration,
+// which is why it is optional here — the authorisation flow checks for it
+// separately, at the point where it is actually required.
 export interface DysonAccountLogin extends DysonAccountBase {
     email:                  string;
-    password:               string;
+    password?:              string;
 }
 export interface DysonAccountToken extends DysonAccountBase {
     token:                  string;

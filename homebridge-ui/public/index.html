@@ -44,6 +44,7 @@
         <div id="dyDone" class="dy-status dy-hidden">
             <span class="dy-ok">&check; Authorised</span>
             <span id="dyDoneWhen" class="dy-hint" style="margin:0"></span>
+            <button type="button" class="dy-link" id="dyForget">Forget password</button>
             <button type="button" class="dy-link" id="dyAgain">Authorise again</button>
         </div>
 
@@ -104,6 +105,7 @@
     const showAuthorised = (created, devices) => {
         $('dyDone').classList.remove('dy-hidden');
         $('dyForm').classList.add('dy-hidden');
+        $('dyForget').classList.toggle('dy-hidden', !$('dyPassword').value);
         const parts = [];
         if (created) parts.push(`since ${new Date(created).toLocaleDateString()}`);
         if (typeof devices === 'number') {
@@ -151,6 +153,19 @@
     }
 
     $('dyAgain').addEventListener('click', () => { clearMsg(); showCodeRequest(); });
+
+    // The password is only needed to exchange a code for a token. Once that is
+    // done it can leave config.json, where it would otherwise sit in plain text.
+    $('dyForget').addEventListener('click', () => {
+        void (async () => {
+            const configs = await readConfig();
+            delete configs[0].dysonAccount.password;
+            await homebridge.updatePluginConfig(configs);
+            $('dyPassword').value = '';
+            show('Password cleared. Press Save to write that to config.json. '
+               + 'Enter it again only if you need to authorise afresh.', 'success');
+        })();
+    });
 
     // Call the plugin's UI server
     const call = async (path, extra) => {
