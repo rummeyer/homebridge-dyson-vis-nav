@@ -1,0 +1,102 @@
+<style>
+    .dyson-auth           { margin-bottom: 1.5rem; }
+    .dyson-auth h4        { margin-top: 1.25rem; }
+    .dyson-step           { padding: .75rem 1rem; border-left: 3px solid var(--bs-primary, #4b6cb7); margin-bottom: 1rem; }
+    .dyson-log            { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                            font-size: .8rem; white-space: pre-wrap; word-break: break-word;
+                            max-height: 14rem; overflow-y: auto; padding: .5rem; border-radius: .25rem;
+                            background: rgba(127,127,127,.12); }
+    .dyson-hidden         { display: none; }
+</style>
+
+<div class="dyson-auth">
+    <p>
+        Authorise access to your MyDyson account. Dyson emails a one-time code,
+        which is exchanged for a token stored alongside this plugin&rsquo;s data
+        &mdash; your password is not saved by this step.
+    </p>
+
+    <div class="dyson-step">
+        <h4>Step 1 &mdash; Request a code</h4>
+        <p class="text-muted mb-2">
+            Uses the email address and password entered in the
+            <strong>Plugin Config</strong> tab.
+        </p>
+        <button type="button" class="btn btn-primary" id="dysonStartAuth">Request code</button>
+    </div>
+
+    <div class="dyson-step">
+        <h4>Step 2 &mdash; Enter the code</h4>
+        <div class="form-group">
+            <label for="dysonOtpCode">Code from the MyDyson email</label>
+            <input type="text" class="form-control" id="dysonOtpCode" autocomplete="one-time-code" placeholder="e.g. 123456">
+        </div>
+        <button type="button" class="btn btn-primary" id="dysonFinishAuth">Submit code</button>
+    </div>
+
+    <div id="dysonResult" class="alert dyson-hidden" role="alert"></div>
+    <div id="dysonLog" class="dyson-log dyson-hidden"></div>
+</div>
+
+<script>
+(() => {
+    const $ = id => document.getElementById(id);
+    const resultEl = $('dysonResult');
+    const logEl    = $('dysonLog');
+
+    // Show an outcome message, styled by severity
+    const showResult = (message, kind) => {
+        resultEl.textContent = message;
+        resultEl.className = `alert alert-${kind}`;
+    };
+
+    // Show the log lines collected by the server, if any
+    const showLog = lines => {
+        if (!lines || !lines.length) {
+            logEl.className = 'dyson-log dyson-hidden';
+            return;
+        }
+        logEl.textContent = lines.join('\n');
+        logEl.className = 'dyson-log';
+    };
+
+    // Read the account details from the current (possibly unsaved) config
+    const getAccount = async () => {
+        const configs = await homebridge.getPluginConfig();
+        const account = configs[0]?.dysonAccount ?? {};
+        return {
+            email:    account.email    ?? '',
+            password: account.password ?? '',
+            china:    account.china === true
+        };
+    };
+
+    // Issue a request to the plugin's UI server
+    const request = async (path, body, button) => {
+        button.disabled = true;
+        homebridge.showSpinner();
+        try {
+            const response = await homebridge.request(path, body);
+            showResult(response.message, 'success');
+            showLog(response.log);
+        } catch (err) {
+            showResult(err.message, 'danger');
+            showLog(err.error?.log);
+        } finally {
+            homebridge.hideSpinner();
+            button.disabled = false;
+        }
+    };
+
+    $('dysonStartAuth').addEventListener('click', async event => {
+        await request('/start-auth', { account: await getAccount() }, event.target);
+    });
+
+    $('dysonFinishAuth').addEventListener('click', async event => {
+        await request('/finish-auth', {
+            account: await getAccount(),
+            otpCode: $('dysonOtpCode').value
+        }, event.target);
+    });
+})();
+</script>

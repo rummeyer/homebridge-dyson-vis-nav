@@ -1,0 +1,155 @@
+// Homebridge plugin for the Dyson 360 Vis Nav robot vacuum
+// Copyright © 2026 Oliver Rummeyer
+// Derived from matterbridge-dyson-robot, copyright © 2025-2026 Alexander Thoukydides
+
+import { connect, IClientOptions, MqttClient } from 'mqtt';
+import {
+    Config,
+    DeviceConfigMock
+} from './config-types.js';
+import { AnsiLogger } from './logger.js';
+import { MaybePromise } from './utils.js';
+import { isDeepStrictEqual } from 'util';
+import { DysonIoTCredentialsResponse } from './dyson-cloud-types.js';
+import { DysonMqttClient } from './dyson-mqtt-client-base.js';
+
+// Internally generated device configuration for Remote Account
+export interface DeviceConfigRemoteMqtt {
+    name:           string;
+    serialNumber:   string;
+    rootTopic:      string;
+    getCredentials: () => Promise<DysonIoTCredentialsResponse>;
+}
+export type DeviceConfigMqtt = DeviceConfigRemoteMqtt | DeviceConfigMock;
+
+// (Re)connections options for the MQTT client
+export interface DysonMqttClientOptions {
+    brokerUrl:      string;
+    options:        IClientOptions;
+}
+
+// Default MQTT options
+const DEFAULT_OPTIONS: IClientOptions = {
+    keepalive:                  10,         // Max 10 seconds between packets
+    manualConnect:              true,       // Disable automatic (re)connection
+    reconnectOnConnackError:    false,      // Disable automatic connection retry
+    reconnectPeriod:            0,          // Disable automatic reconnection
+    resubscribe:                true,       // Resubscribe to topics on reconnect
+    rejectUnauthorized:         false,      // Allow self-signed certificates
+    protocolId:                 'MQIsdp',   // MQTT version 3.1
+    protocolVersion:            3
+};
+
+// A Dyson MQTT client that supports creating a new client for each connection
+export abstract class DysonMqttClientLive extends DysonMqttClient {
+
+    // The current MQTT client and its options
+    private delegate?:      MqttClient;
+    private clientOptions?: DysonMqttClientOptions;
+    private count = 0;
+
+    // Obtain the (re)connection options
+    protected abstract getConnectionOptions(): MaybePromise<DysonMqttClientOptions>;
+
+    // Destroy an MQTT client
+    private async destroyClient(mqtt: MqttClient): Promise<void> {
+        this.log.debug('Cleaning up MQTT client');
+
+        // Remove any previous event listeners, if any
+        mqtt.removeAllListeners('close');
+        mqtt.removeAllListeners('connect');
+        mqtt.removeAllListeners('error');
+        mqtt.removeAllListeners('message');
+
+        // Close the client
+        await mqtt.endAsync(true);
+    }
+
+    // Create a new MQTT client
+    private createClient(clientOptions: DysonMqttClientOptions): MqttClient {
+        this.log.debug(`Creating MQTT client #${++this.count}`);
+
+        // MQTT debug logging, if enabled
+        let log: IClientOptions['log'];
+        if (this.config.debugFeatures.includes('Log MQTT Client')) {
+            const logPrefix = `MQTT client #${this.count}:`;
+            log = (...args: unknown[]): void => { this.log.debug(logPrefix, ...args); };
+        }
+
+        // Create the new client
+        const { brokerUrl, options } = clientOptions;
+        const mqtt = connect(brokerUrl, { ...DEFAULT_OPTIONS, log, ...options });
+
+        // Add the new listeners to forward events
+        mqtt.on('close',   (...args) => this.emit('close',   ...args));
+        mqtt.on('connect', (...args) => this.emit('connect', ...args));
+        mqtt.on('error',   (...args) => this.emit('error',   ...args));
+        mqtt.on('message', (...args) => this.emit('message', ...args));
+        return mqtt;
+    }
+
+    // Start (re)connecting the MQTT client (resolves after initiating connect)
+    async connect(): Promise<void> {
+        // Check whether a new client is required
+        const clientOptions = await this.getConnectionOptions();
+        if (isDeepStrictEqual(clientOptions, this.clientOptions)) {
+            // Connection options are unchanged, so just reconnect
+            this.log.debug('Reconnecting existing MQTT client...');
+            this.mqtt.reconnect();
+        } else {
+            // Clean-up the old MQTT client, if any
+            if (this.delegate) await this.destroyClient(this.delegate);
+
+            // Create a new MQTT client
+            this.clientOptions = structuredClone(clientOptions);
+            this.delegate = this.createClient(clientOptions);
+
+            // Initiate the connection
+            this.log.debug('Connecting new MQTT client...');
+            this.delegate.connect();
+        }
+    }
+
+    // Terminate the MQTT client
+    async stop(): Promise<void> {
+        if (!this.delegate) return;
+        await this.destroyClient(this.delegate);
+        this.delegate = undefined;
+    }
+
+    // The current MQTT client
+    get mqtt(): MqttClient {
+        if (!this.delegate) throw new Error('No MQTT client');
+        return this.delegate;
+    }
+
+    // Forward other MQTT client methods
+    async publishAsync  (...args: Parameters<MqttClient['publishAsync'  ]>) { return this.mqtt.publishAsync  (...args); }
+    async subscribeAsync(...args: Parameters<MqttClient['subscribeAsync']>) { return this.mqtt.subscribeAsync(...args); }
+}
+
+// A Dyson MQTT client using a AWS IoT connection via websockets
+export class DysonMqttClientRemote extends DysonMqttClientLive {
+
+    // Construct a new MQTT client
+    constructor(log: AnsiLogger, config: Config, readonly deviceConfig: DeviceConfigRemoteMqtt) {
+        super(log, config);
+    }
+
+    // Obtain the (re)connection options
+    protected async getConnectionOptions(): Promise<DysonMqttClientOptions> {
+        const credentials = await this.deviceConfig.getCredentials();
+        const { Endpoint } = credentials;
+        const { ClientId, CustomAuthorizerName, TokenKey, TokenSignature, TokenValue } = credentials.IoTCredentials;
+
+        // Prepare and return the connection options
+        const brokerUrl = `wss://${Endpoint}/mqtt`;
+        const headers: Record<string, string> = {
+            [TokenKey]:                         TokenValue,
+            'X-Amz-CustomAuthorizer-Name':      CustomAuthorizerName,
+            'X-Amz-CustomAuthorizer-Signature': TokenSignature
+        };
+        const options: IClientOptions = { clientId: ClientId, wsOptions: { headers } };
+        return { brokerUrl, options };
+    }
+}

@@ -1,0 +1,177 @@
+{
+    "pluginAlias": "DysonVisNav",
+    "pluginType": "platform",
+    "singular": true,
+    "customUiPath": "./homebridge-ui",
+    "headerDisplay": "Exposes the Dyson 360 Vis Nav robot vacuum to Apple Home as a native Matter robot vacuum cleaner.\n\n**Matter must be enabled** in the Homebridge settings: a robot vacuum has no HomeKit (HAP) equivalent, so this plugin cannot work without it.",
+    "footerDisplay": "Use the **MyDyson Account** tab above to authorise access to your MyDyson account.",
+    "schema": {
+        "type": "object",
+        "properties": {
+            "name": {
+                "title": "Name",
+                "type": "string",
+                "default": "Dyson 360 Vis Nav",
+                "required": true,
+                "description": "Name shown in the Homebridge log."
+            },
+            "provisioningMethod": {
+                "title": "Provisioning Method",
+                "type": "string",
+                "default": "Remote Account",
+                "required": true,
+                "oneOf": [
+                    { "title": "Connect via AWS IoT gateway / Configure using MyDyson account", "enum": ["Remote Account"] },
+                    { "title": "Mock devices (replay a recorded MQTT session, for development)", "enum": ["Mock Devices"] }
+                ],
+                "description": "The Dyson 360 Vis Nav does not accept local MQTT connections, so the cloud gateway is the only way to reach a real device."
+            },
+            "dysonAccount": {
+                "type": "object",
+                "condition": { "functionBody": "return model.provisioningMethod === 'Remote Account';" },
+                "properties": {
+                    "email": {
+                        "title": "Email Address",
+                        "type": "string",
+                        "format": "email",
+                        "required": true,
+                        "description": "The email address used with the MyDyson app."
+                    },
+                    "password": {
+                        "title": "Password",
+                        "type": "string",
+                        "required": true,
+                        "description": "The password used with the MyDyson app."
+                    },
+                    "china": {
+                        "title": "Account registered in China",
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "token": {
+                        "title": "Authorisation Token",
+                        "type": "string",
+                        "description": "Set automatically by the MyDyson Account tab. Do not edit by hand."
+                    }
+                }
+            },
+            "devices": {
+                "title": "Mock Devices",
+                "type": "array",
+                "condition": { "functionBody": "return model.provisioningMethod === 'Mock Devices';" },
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name":         { "title": "Name",          "type": "string", "required": true },
+                        "serialNumber": { "title": "Serial Number", "type": "string", "required": true },
+                        "rootTopic":    { "title": "MQTT Root Topic", "type": "string", "default": "277", "required": true },
+                        "filename":     { "title": "MQTT Log File",  "type": "string", "required": true,
+                                          "description": "Path to a recorded .jsonl MQTT session, e.g. the bundled mqtt-logs/277.jsonl." }
+                    }
+                }
+            },
+            "whiteList": {
+                "title": "Serial Number Allow List",
+                "type": "array",
+                "items": { "title": "Serial Number", "type": "string" },
+                "description": "If non-empty, only these devices are exposed."
+            },
+            "blackList": {
+                "title": "Serial Number Block List",
+                "type": "array",
+                "items": { "title": "Serial Number", "type": "string" },
+                "description": "Devices to exclude. Ignored if the allow list is non-empty."
+            },
+            "simpleModeTagsRvc": {
+                "title": "Use simple RVC Clean Mode tags",
+                "type": "boolean",
+                "default": true,
+                "description": "Advertise a single mode tag per cleaning mode. Disable only if your controller needs the full tag set."
+            },
+            "wildcardTopic": {
+                "title": "Subscribe to wildcard MQTT topic",
+                "type": "boolean",
+                "default": false,
+                "description": "Subscribe to all topics for the device. Useful for capturing logs when reporting an issue."
+            },
+            "logMapStyle": {
+                "title": "Clean Map Logging",
+                "type": "string",
+                "default": "Off",
+                "oneOf": [
+                    { "title": "Off", "enum": ["Off"] },
+                    { "title": "Monospaced terminal", "enum": ["Monospaced"] },
+                    { "title": "Homebridge log viewer", "enum": ["Homebridge"] }
+                ],
+                "description": "Render a map of each completed clean into the log."
+            },
+            "statusPollInterval": {
+                "title": "Status Poll Interval (seconds)",
+                "type": "integer",
+                "default": 30,
+                "minimum": 5,
+                "maximum": 3600
+            },
+            "debug": {
+                "title": "Enable debug logging",
+                "type": "boolean",
+                "default": false
+            },
+            "debugFeatures": {
+                "title": "Debug Features",
+                "type": "array",
+                "items": {
+                    "title": "Feature",
+                    "type": "string",
+                    "enum": [
+                        "Log API Headers",
+                        "Log API Bodies",
+                        "Log MQTT Client",
+                        "Log MQTT Payloads",
+                        "Log MQTT Payloads as JSON",
+                        "Log Serial Numbers",
+                        "Log Debug as Info"
+                    ]
+                }
+            }
+        }
+    },
+    "layout": [
+        "name",
+        "provisioningMethod",
+        {
+            "type": "fieldset",
+            "title": "MyDyson Account",
+            "expandable": true,
+            "expanded": true,
+            "condition": { "functionBody": "return model.provisioningMethod === 'Remote Account';" },
+            "items": ["dysonAccount.email", "dysonAccount.password", "dysonAccount.china"]
+        },
+        {
+            "type": "fieldset",
+            "title": "Mock Devices",
+            "expandable": true,
+            "condition": { "functionBody": "return model.provisioningMethod === 'Mock Devices';" },
+            "items": ["devices"]
+        },
+        {
+            "type": "fieldset",
+            "title": "Device Filtering",
+            "expandable": true,
+            "items": ["whiteList", "blackList"]
+        },
+        {
+            "type": "fieldset",
+            "title": "Advanced",
+            "expandable": true,
+            "items": [
+                "simpleModeTagsRvc",
+                "wildcardTopic",
+                "logMapStyle",
+                "statusPollInterval",
+                "debug",
+                "debugFeatures"
+            ]
+        }
+    ]
+}

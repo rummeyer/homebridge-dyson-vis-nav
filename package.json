@@ -1,0 +1,77 @@
+{
+    "name": "homebridge-dyson-vis-nav",
+    "displayName": "Dyson 360 Vis Nav",
+    "description": "A Homebridge plugin that exposes the Dyson 360 Vis Nav robot vacuum to Apple Home as a native Matter robot vacuum cleaner, via the Dyson AWS IoT MQTT gateway.",
+    "version": "0.1.0",
+    "license": "ISC",
+    "author": "Oliver Rummeyer",
+    "keywords": [
+        "homebridge-plugin",
+        "homebridge",
+        "matter",
+        "dyson",
+        "360 Vis Nav",
+        "RB03",
+        "robot",
+        "vacuum",
+        "cleaner",
+        "homekit"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/rummeyer/homebridge-dyson-vis-nav.git"
+    },
+    "bugs": {
+        "url": "https://github.com/rummeyer/homebridge-dyson-vis-nav/issues"
+    },
+    "homepage": "https://github.com/rummeyer/homebridge-dyson-vis-nav#readme",
+    "type": "module",
+    "main": "dist/index.js",
+    "engines": {
+        "node": "^22 || ^24 || ^26",
+        "homebridge": "^2.4.0"
+    },
+    "dependencies": {
+        "mqtt": "^5.15.2",
+        "node-persist": "^4.0.4",
+        "pngjs": "^7.0.0",
+        "semver": "^7.8.5",
+        "ts-interface-checker": "^1.0.2",
+        "undici": "^8.10.2",
+        "ws": "^8.21.3"
+    },
+    "devDependencies": {
+        "@eslint/js": "^10.0.1",
+        "@homebridge/plugin-ui-utils": "^2.2.6",
+        "@types/node": "^22.20.2",
+        "@types/node-persist": "^3.1.8",
+        "@types/pngjs": "^6.0.5",
+        "@types/semver": "^7.8.0",
+        "eslint": "^10.10.0",
+        "globals": "^17.12.0",
+        "homebridge": "^2.4.0",
+        "rimraf": "^6.1.3",
+        "ts-interface-builder": "^0.3.3",
+        "tsx": "^4.23.13",
+        "typescript": "^5.9.2",
+        "typescript-eslint": "^8.70.0"
+    },
+    "scripts": {
+        "build-checkers": "mkdir -p ./src/ti && ts-interface-builder -c -o ./src/ti ./src/*-types.ts && tsx bin/ts-interface-post.ts ./src/ti",
+        "build-tsc": "tsc -p ./src",
+        "build": "npm run build-checkers && npm run build-tsc",
+        "clean": "rimraf ./src/ti ./dist",
+        "prepare": "npm run build",
+        "lint": "eslint 'bin/**/*.ts' 'src/**/*.ts' --max-warnings=0",
+        "watch": "npm run build && npm link && nodemon",
+        "prepublishOnly": "npm run build && npm run lint"
+    },
+    "files": [
+        "dist/",
+        "homebridge-ui/",
+        "mqtt-logs/",
+        "config.schema.json",
+        "README.md",
+        "LICENSE"
+    ]
+}

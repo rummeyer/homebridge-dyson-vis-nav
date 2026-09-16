@@ -1,0 +1,268 @@
+// Homebridge plugin for the Dyson 360 Vis Nav robot vacuum
+// Copyright © 2026 Oliver Rummeyer
+// Derived from matterbridge-dyson-robot, copyright © 2025-2026 Alexander Thoukydides
+
+import { PowerSource, RvcOperationalState } from './matter-clusters.js';
+import { Dyson360Faults, Dyson360State } from './dyson-360-types.js';
+
+/* eslint-disable max-len */
+
+// Mapping of a single fault to RVC Operational State and Power Source clusters
+export interface Dyson360FaultDetail {
+    msg:            string;
+    opError?:       keyof typeof RvcOperationalState.ErrorState;
+    batFault?:      keyof typeof PowerSource.BatFault;
+    chargeFault?:   keyof typeof PowerSource.BatChargeFault;
+}
+
+// Fault code patterns and ranges
+type FaultLevel1 = `${number}.#.#`;
+type FaultLevel2 = `${number}.${number}.#`;
+type FaultLevel3 = `${number}.${number}.${number}`;
+export type Dyson360FaultPattern = FaultLevel1 | FaultLevel2 | FaultLevel3;
+export type Dyson360FaultRange = [FaultLevel1, FaultLevel1] | [FaultLevel2, FaultLevel2] | [FaultLevel3, FaultLevel3];
+export type Dyson360FaultPatternOrRange = Dyson360FaultPattern | Dyson360FaultRange;
+
+// Dyson robot vacuum states that map to errors
+export const DYSON_360_FAULT_STATES = new Map<Dyson360State, Dyson360FaultDetail>([
+    [Dyson360State.MachineOff,              { msg: 'Offline'                                                                                                    }],
+    [Dyson360State.FaultCallHelpline,       { msg: 'Call Dyson helpline'                                                                                        }],
+    [Dyson360State.FaultContactHelpline,    { msg: 'Contact Dyson helpline'                                                                                     }],
+    [Dyson360State.FaultCritical,           { msg: 'Critical fault'                                                                                             }],
+    [Dyson360State.FaultGettingInfo,        { msg: 'Getting info'                                                                                               }],
+    [Dyson360State.FaultLost,               { msg: 'Lost location',                                 opError: 'UnableToCompleteOperation'                        }],
+    [Dyson360State.FaultOnDock,             { msg: 'Fault on dock'                                                                                              }],
+    [Dyson360State.FaultOnDockCharged,      { msg: 'Fault on dock (charged)'                                                                                    }],
+    [Dyson360State.FaultOnDockCharging,     { msg: 'Fault on dock (charging)'                                                                                   }],
+    [Dyson360State.FaultReplaceOnDock,      { msg: 'Place on dock',                                 opError: 'FailedToFindChargingDock'                         }],
+    [Dyson360State.FaultReturnToDock,       { msg: 'Unable to return to dock',                      opError: 'FailedToFindChargingDock'                         }],
+    [Dyson360State.FaultRunningDiagnostic,  { msg: 'Running diagnostic'                                                                                         }],
+    [Dyson360State.FaultUserRecoverable,    { msg: 'User-recoverable fault',                        opError: 'Stuck'                                            }],
+    [Dyson360State.FullCleanAbandoned,      { msg: 'Abandoned clean',                               opError: 'UnableToCompleteOperation'                        }]
+]);
+
+// Dyson robot vacuum fault category mapping to errors
+export type Dyson360FaultCategory = keyof Dyson360Faults;
+export const DYSON_360_FAULT_CATEGORIES: Record<Dyson360FaultCategory, Dyson360FaultDetail> = {
+    AIRWAYS:                    { msg: 'Airways fault',             /* Lights: 1 red */             opError: 'DustBinFull'                                      },
+    BRUSH_BAR_AND_TRACTION:     { msg: 'Robot stuck',               /* Lights: 2 red */             opError: 'BrushJammed'                                      },
+    CHARGE_STATION:             { msg: 'Unable to return to dock',  /* Lights: 3 red */             opError: 'FailedToFindChargingDock'                         },
+    OPTICS:                     { msg: 'Optical sensors fault',     /* Lights: 4 red */             opError: 'NavigationSensorObscured'                         },
+    LIFT:                       { msg: 'Robot lifted',                                              opError: 'Stuck'                                            },
+    LOST:                       { msg: 'Navigation fault',          /* Lights: Red battery */       opError: 'UnableToCompleteOperation'                        },
+    BATTERY:                    { msg: 'Battery fault',                                             batFault: 'Unspecified', chargeFault: 'Unspecified'         }
+};
+
+// Specific faults/ranges in 360 Eye / 360 Heurist / 360 VisNav format
+export const DYSON_360_FAULT_TRIPLET_CODES: [Dyson360FaultPatternOrRange, Dyson360FaultDetail][] = [
+    // Dyson 360 Eye faults (observed)
+    ['1.0.-1',                  { msg: 'Bin full or airways blocked',                               opError: 'DustBinFull'                                      }],
+    ['3.5.-1',                  { msg: 'Brush bar or tracks stuck',                                 opError: 'BrushJammed'                                      }],
+    ['7.0.-1',                  { msg: 'Bin missing or not detected',                               opError: 'DustBinMissing'                                   }],
+    ['9.0.-1',                  { msg: 'Unable to return to dock',                                  opError: 'FailedToFindChargingDock'                         }],
+
+    // Dyson 360 Vis Nav faults
+    // Observed but not documented by Dyson
+    ['3.24.#',                  { msg: 'Stuck',                                                     opError: 'Stuck'                                            }],
+    // https://support.dyson.com.au/supportHome/Vacuums/Robots/360visnav/304640-01/using-your-robot/fault-codes
+    ['1.0.#',                   { msg: 'Airways blocked',                                           opError: 'DustBinFull'                                      }],
+    ['1.2.#',                   { msg: 'Check bin level',                                           opError: 'DustBinFull'                                      }],
+    ['1.4.#',                   { msg: 'Vacuum calibration missing'                                                                                             }],
+    [['1.5.#', '1.6.#'],        { msg: 'Filter not detected',                                       opError: 'DustBinMissing'                                   }],
+    [['1.7.#', '1.8.#'],        { msg: 'Check airways',                                             opError: 'DustBinFull'                                      }],
+    ['3.3.#',                   { msg: 'Brush bar motor too hot',                                   opError: 'BrushJammed'                                      }],
+    ['3.4.#',                   { msg: 'Wheel motor too hot',                                       opError: 'WheelsJammed'                                     }],
+    ['3.5.#',                   { msg: 'Brush bar stuck',                                           opError: 'BrushJammed'                                      }],
+    ['3.6.#',                   { msg: 'Wheel stuck',                                               opError: 'WheelsJammed'                                     }],
+    [['3.7.#', '3.8.#'],        { msg: 'Wheel hardware failure',                                    opError: 'WheelsJammed'                                     }],
+    ['3.9.#',                   { msg: 'Robot stuck',                                               opError: 'Stuck'                                            }],
+    [['3.10.#', '3.15.#'],      { msg: 'ADC error',                                                 opError: 'NavigationSensorObscured'                         }],
+    ['3.16.#',                  { msg: 'Brush bar stuck',                                           opError: 'BrushJammed'                                      }],
+    ['3.16.12',                 { msg: 'Brush bar motor too hot',                                   opError: 'BrushJammed'                                      }],
+    ['3.16.13',                 { msg: 'Brush bar motor too cold',                                  opError: 'BrushJammed'                                      }],
+    ['3.16.16',                 { msg: 'Brush bar motor winding failure',                           opError: 'BrushJammed'                                      }],
+    ['3.16.30',                 { msg: 'Brush bar communication failure',                           opError: 'BrushJammed'                                      }],
+    ['3.16.33',                 { msg: 'Brush bar communication failure',                           opError: 'BrushJammed'                                      }],
+    ['3.17.#',                  { msg: 'Wheel stuck',                                               opError: 'WheelsJammed'                                     }],
+    ['3.19.#',                  { msg: 'Wheel stuck',                                               opError: 'WheelsJammed'                                     }],
+    [['3.20.#', '3.21.#'],      { msg: 'Edge actuator stuck',                                       opError: 'BrushJammed'                                      }],
+    ['3.22.#',                  { msg: 'Edge actuator switch stuck',                                opError: 'BrushJammed'                                      }],
+    ['3.23.#',                  { msg: 'Brush bar stuck',                                           opError: 'BrushJammed'                                      }],
+    ['3.23.12',                 { msg: 'Brush bar motor too hot',                                   opError: 'BrushJammed'                                      }],
+    ['3.23.13',                 { msg: 'Brush bar motor too cold',                                  opError: 'BrushJammed'                                      }],
+    ['3.23.16',                 { msg: 'Brush bar motor winding failure',                           opError: 'BrushJammed'                                      }],
+    ['3.23.30',                 { msg: 'Brush bar communication failure',                           opError: 'BrushJammed'                                      }],
+    ['3.23.33',                 { msg: 'Brush bar communication failure',                           opError: 'BrushJammed'                                      }],
+    [['3.100.#', '3.112.#'],    { msg: 'Safety prevents motion',                                    opError: 'Stuck'                                            }],
+    ['3.113.#',                 { msg: 'Left wheel - Wheel motor too cold',                         opError: 'WheelsJammed'                                     }],
+    [['3.114.#', '3.115.#'],    { msg: 'Left wheel - Wheel motor too hot',                          opError: 'WheelsJammed'                                     }],
+    [['3.116.#', '3.120.#'],    { msg: 'Safety prevents motion',                                    opError: 'Stuck'                                            }],
+    ['3.121.#',                 { msg: 'Right wheel - Wheel motor too cold',                        opError: 'WheelsJammed'                                     }],
+    [['3.122.#', '3.123.#'],    { msg: 'Right wheel - Wheel motor too hot',                         opError: 'WheelsJammed'                                     }],
+    [['3.124.#', '3.128.#'],    { msg: 'Safety prevents motion',                                    opError: 'Stuck'                                            }],
+    ['3.129.#',                 { msg: 'Brush bar motor too cold',                                  opError: 'BrushJammed'                                      }],
+    [['3.130.#', '3.131.#'],    { msg: 'Brush bar motor too hot',                                   opError: 'BrushJammed'                                      }],
+    [['5.0.#', '5.2.#'],        { msg: 'Battery pack - ADC error',                                  batFault: 'Unspecified', chargeFault: 'Unspecified'         }],
+    ['5.3.#',                   { msg: 'Battery locked out',                                        batFault: 'Unspecified', chargeFault: 'SafetyTimeout'       }],
+    ['5.4.#',                   { msg: 'Battery disconnected',                                      batFault: 'Unspecified', chargeFault: 'BatteryAbsent'       }],
+    ['5.5.#',                   { msg: 'Battery low voltage',                                       batFault: 'Unspecified', chargeFault: 'BatteryUnderVoltage' }],
+    ['5.6.#',                   { msg: 'Battery charge required',                                   batFault: 'Unspecified', opError: 'LowBattery'              }],
+    [['5.7.#', '5.9.#'],        { msg: 'Battery too hot',                                           batFault: 'OverTemp',    chargeFault: 'BatteryTooHot'       }],
+    ['5.10.#',                  { msg: 'Unable to shut down'                                                                                                    }],
+    ['7.#.#',                   { msg: 'Bin not detected',                                          opError: 'DustBinMissing'                                   }],
+    ['9.#.#',                   { msg: 'Unable to dock',                                            opError: 'FailedToFindChargingDock'                         }],
+    [['11.0.#', '11.1.#'],      { msg: 'Distance sensor calibration error',                         opError: 'NavigationSensorObscured'                         }],
+    ['11.2.#',                  { msg: 'ADC error',                                                 opError: 'NavigationSensorObscured'                         }],
+    ['11.3.#',                  { msg: 'Distance sensor error',                                     opError: 'NavigationSensorObscured'                         }],
+    ['11.5.#',                  { msg: 'Camera calibration error',                                  opError: 'NavigationSensorObscured'                         }],
+    ['11.6.#',                  { msg: 'Camera unplugged',                                          opError: 'NavigationSensorObscured'                         }],
+    ['11.7.#',                  { msg: 'Distance sensor error',                                     opError: 'NavigationSensorObscured'                         }],
+    ['11.8.#',                  { msg: 'Distance sensor calibration error',                         opError: 'NavigationSensorObscured'                         }],
+    ['11.9.#',                  { msg: 'Distance sensor calibration error',                         opError: 'NavigationSensorObscured'                         }],
+    ['11.10.#',                 { msg: 'Drop detected at start of clean',                           opError: 'UnableToStartOrResume'                            }],
+    [['11.11.#', '11.14.#'],    { msg: 'ADC error',                                                 opError: 'NavigationSensorObscured'                         }],
+    ['11.15.#',                 { msg: 'Unclean distance sensor',                                   opError: 'NavigationSensorObscured'                         }],
+    ['11.16.#',                 { msg: 'Distance sensor error',                                     opError: 'NavigationSensorObscured'                         }],
+    ['11.17.#',                 { msg: 'Distance sensor communication error',                       opError: 'NavigationSensorObscured'                         }],
+    ['11.18.#',                 { msg: 'Distance sensor calibration error',                         opError: 'NavigationSensorObscured'                         }],
+    ['11.19.#',                 { msg: 'Drop sensor maintenance alert',                             opError: 'NavigationSensorObscured'                         }],
+    ['11.20.#',                 { msg: 'Non-drop sensor maintenance alert',                         opError: 'NavigationSensorObscured'                         }],
+    ['11.21.#',                 { msg: 'Distance sensor error',                                     opError: 'NavigationSensorObscured'                         }],
+    ['11.22.#',                 { msg: 'Unclean distance sensor',                                   opError: 'NavigationSensorObscured'                         }],
+    [['13.0.-1', '13.0.1'],     { msg: 'Dirty obstacle sensors - Cannot find a route back to dock', opError: 'NavigationSensorObscured'                         }],
+    [['13.1.#', '13.2.#'],      { msg: 'Navigation sensor error',                                   opError: 'NavigationSensorObscured'                         }],
+    ['13.3.-1',                 { msg: 'Low battery',                                               opError: 'LowBattery'                                       }],
+    ['13.3.1',                  { msg: 'Dirty obstacle sensors - Low battery',                      opError: 'LowBattery'                                       }],
+    ['13.4.#',                  { msg: 'Low battery at clean start',                                opError: 'LowBattery'                                       }],
+    ['13.5.#',                  { msg: 'Camera exposure not settled',                               opError: 'NavigationSensorObscured'                         }],
+    [['13.6.#', '13.7.#'],      { msg: 'Unable to start',                                           opError: 'UnableToStartOrResume'                            }],
+    ['13.8.#',                  { msg: 'Failed to set state'                                                                                                    }],
+    ['13.9.#',                  { msg: 'Unable to start',                                           opError: 'UnableToStartOrResume'                            }],
+    ['13.10.#',                 { msg: 'Insufficient features to find location',                    opError: 'CannotReachTargetArea'                            }],
+    ['13.12.#',                 { msg: 'High uncertainty in discovery',                             opError: 'CannotReachTargetArea'                            }],
+    ['13.13.#',                 { msg: 'Persistent location lost',                                  opError: 'CannotReachTargetArea'                            }],
+    ['13.14.#',                 { msg: 'Discovered wrong floor',                                    opError: 'CannotReachTargetArea'                            }],
+    ['13.15.#',                 { msg: 'Persistent location jump',                                  opError: 'CannotReachTargetArea'                            }],
+    ['13.16.#',                 { msg: 'Software error'                                                                                                         }],
+    ['13.17.#',                 { msg: 'Replacement fault'                                                                                                      }],
+    ['13.18.#',                 { msg: 'Low battery',                                               opError: 'LowBattery'                                       }],
+    [['13.101.#', '13.102.#'],  { msg: 'Safety prevents motion',                                    opError: 'Stuck'                                            }],
+    [['13.105.#', '13.106.#'],  { msg: 'Safety prevents motion',                                    opError: 'Stuck'                                            }],
+    ['13.132.#',                { msg: 'Internal temperature too cold',                             batFault: 'UnderTemp'                                       }],
+    [['13.133.#', '13.134.#'],  { msg: 'Internal temperature too hot',                              batFault: 'OverTemp'                                        }],
+    [['13.135.#', '13.151.#'],  { msg: 'Safety prevents motion',                                    opError: 'Stuck'                                            }],
+    [['13.157.#', '13.162.#'],  { msg: 'Safety prevents motion',                                    opError: 'Stuck'                                            }],
+    ['17.0.#',                  { msg: 'Software error'                                                                                                         }],
+    ['17.2.#',                  { msg: 'Configuration data missing'                                                                                             }],
+    ['17.3.#',                  { msg: 'Software error'                                                                                                         }],
+    ['17.4.#',                  { msg: 'Unable to start',                                           opError: 'UnableToStartOrResume'                            }],
+    ['17.5.#',                  { msg: 'Configuration data missing'                                                                                             }],
+    [['17.6.#', '17.8.#'],      { msg: 'Unable to start',                                           opError: 'UnableToStartOrResume'                            }],
+    ['17.9.#',                  { msg: 'Inconsistent Sensor Time - Software error'                                                                              }],
+    ['17.10.#',                 { msg: 'Software error'                                                                                                         }],
+    ['17.11.#',                 { msg: 'Safety prevents motion',                                    opError: 'Stuck'                                            }],
+    ['17.12.#',                 { msg: 'Edge actuator - Brush bar motor too hot',                   opError: 'BrushJammed'                                      }],
+    ['17.13.#',                 { msg: 'Could not start LCD screen'                                                                                             }],
+    ['17.14.#',                 { msg: 'Low level PCB communication error'                                                                                      }],
+    ['17.15.#',                 { msg: 'Wheel stuck',                                               opError: 'WheelsJammed'                                     }],
+    ['17.16.#',                 { msg: 'Failed to upgrade'                                                                                                      }],
+    ['17.17.#',                 { msg: 'Low memory'                                                                                                             }],
+    ['17.18.#',                 { msg: 'Failed to save map'                                                                                                     }],
+    ['17.19.#',                 { msg: 'Unable to start',                                           opError: 'UnableToStartOrResume'                            }],
+    ['17.20.#',                 { msg: 'Unable to upload robot logs'                                                                                            }],
+    ['17.21.#',                 { msg: 'DHCP - Software error'                                                                                                  }],
+    ['17.22.#',                 { msg: 'IMU data error'                                                                                                         }],
+    ['17.23.#',                 { msg: 'Zoned map error',                                           opError: 'CannotReachTargetArea'                            }],
+    [['17.100.#', '17.703.#'],  { msg: 'Unhandled alert'                                                                                                        }],
+    [['19.0.#', '19.2.#'],      { msg: 'Robot too hot',                                             batFault: 'OverTemp'                                        }],
+    ['19.3.#',                  { msg: 'Safety prevents motion',                                    opError: 'Stuck'                                            }],
+    ['19.4.#',                  { msg: 'ADC error',                                                 opError: 'NavigationSensorObscured'                         }],
+    ['19.5.#',                  { msg: 'Wheel motor too hot',                                       opError: 'WheelsJammed'                                     }],
+    ['19.6.#',                  { msg: 'Charge contact too hot',                                    chargeFault: 'AmbientTooHot'                                }],
+    ['19.7.#',                  { msg: 'Dirt detect sensor error'                                                                                               }],
+    ['19.8.#',                  { msg: 'Optical flow sensor error'                                                                                              }],
+    ['19.10.#',                 { msg: 'Vacuum fault',                                              opError: 'DustBinFull'                                      }],
+    ['19.11.#',                 { msg: 'Illumination ring error'                                                                                                }],
+    ['19.12.#',                 { msg: 'Routine maintenance',                                       opError: 'NavigationSensorObscured'                         }],
+    ['21.#.#',                  { msg: 'ADC error',                                                 opError: 'NavigationSensorObscured'                         }],
+    ['23.0.#',                  { msg: 'Robot lifted',                                              opError: 'Stuck'                                            }],
+    [['23.1.#', '23.4.#'],      { msg: 'Robot cannot recover from a drop',                          opError: 'Stuck'                                            }],
+    ['23.5.#',                  { msg: 'Rotated - Robot lifted',                                    opError: 'Stuck'                                            }]
+];
+
+// Specific faults in Spot+Scrub Ai format
+export const DYSON_360_FAULT_SINGLE_CODES = new Map<number, Dyson360FaultDetail>([
+    // Dyson 360 Spot+Scrub Ai faults
+    // https://support.dyson.com.au/supportHome/Vacuums/Robots/spot-scrub-ai/218087-01/troubleshooting-your-robot/faults-456826
+    [ 500,                      { msg: 'LiDAR sensor obstructed',                                   opError: 'NavigationSensorObscured'                         }],
+    [ 501,                      { msg: 'Wheels lifted',                                             opError: 'Stuck'                                            }],
+    [ 502,                      { msg: 'Battery is low',                                            opError: 'LowBattery'                                       }],
+    [ 503,                      { msg: "Robot's bin not detected",                                  opError: 'DustBinMissing'                                   }],
+    [ 504,                      { msg: 'Gyroscopic sensor error',                                   opError: 'NavigationSensorObscured'                         }],
+    [ 507,                      { msg: 'Unable to determine position',                              opError: 'CannotReachTargetArea'                            }],
+    [ 508,                      { msg: 'Unable to climb slope',                                     opError: 'Stuck'                                            }],
+    [ 509,                      { msg: 'Drop sensor obstructed',                                    opError: 'NavigationSensorObscured'                         }],
+    [ 510,                      { msg: 'Collision sensor obstructed',                               opError: 'NavigationSensorObscured'                         }],
+    [ 511,                      { msg: 'Unable to return to dock',                                  opError: 'FailedToFindChargingDock'                         }],
+    [ 513,                      { msg: 'Robot stuck',                                               opError: 'Stuck'                                            }],
+    [ 514,                      { msg: 'Robot stuck',                                               opError: 'Stuck'                                            }],
+    [ 516,                      { msg: 'Battery temperature high',                                  batFault: 'OverTemp',   chargeFault: 'BatteryTooHot'        }],
+    [ 518,                      { msg: 'Battery is low',                                            opError: 'LowBattery'                                       }],
+    [ 521,                      { msg: "Dock's clean water tank not detected",                      opError: 'WaterTankMissing'                                 }],
+    [ 522,                      { msg: 'Wet roller not detected',                                   opError: 'MopCleaningPadMissing'                            }],
+    [ 560,                      { msg: 'Side sweeper stuck',                                        opError: 'BrushJammed'                                      }],
+    [ 561,                      { msg: 'Camera obstructed',                                         opError: 'NavigationSensorObscured'                         }],
+    [ 562,                      { msg: 'Wall follow sensor obstructed',                             opError: 'NavigationSensorObscured'                         }],
+    [ 563,                      { msg: "Robot's bin not detected",                                  opError: 'DustBinMissing'                                   }],
+    [ 566,                      { msg: "Robot's dirty water tank not detected",                     opError: 'DirtyWaterTankMissing'                            }],
+    [ 567,                      { msg: 'Brush bar error',                                           opError: 'BrushJammed'                                      }],
+    [ 568,                      { msg: 'Left wheel stuck',                                          opError: 'WheelsJammed'                                     }],
+    [ 569,                      { msg: 'Right wheel stuck',                                         opError: 'WheelsJammed'                                     }],
+    [ 570,                      { msg: 'Brush bar error',                                           opError: 'BrushJammed'                                      }],
+    [ 572,                      { msg: 'Robot stuck',                                               opError: 'Stuck'                                            }],
+    [ 581,                      { msg: "Dock's clean water tank empty",                             opError: 'WaterTankEmpty'                                   }],
+    [ 582,                      { msg: "Dock's dirty water tank full",                              opError: 'DirtyWaterTankFull'                               }],
+    [ 583,                      { msg: "Dock's clean water tank not detected",                      opError: 'WaterTankMissing'                                 }],
+    [ 584,                      { msg: "Dock's dirty water tank not detected",                      opError: 'DirtyWaterTankMissing'                            }],
+    [ 586,                      { msg: "Robot's dirty water tank full",                             opError: 'DirtyWaterTankFull'                               }],
+    [ 587,                      { msg: 'Communication failure'                                                                                                  }],
+    [ 591,                      { msg: "Dock's bin full",                                           opError: 'DustBinFull'                                      }],
+    [ 592,                      { msg: "Dock's filter error"                                                                                                    }],
+    [ 594,                      { msg: "Unable to empty robot's bin",                               opError: 'DustBinFull'                                      }],
+    [ 595,                      { msg: 'Communication failure'                                                                                                  }],
+    [ 596,                      { msg: "Unable to empty robot's bin",                               opError: 'DustBinFull'                                      }],
+    [ 597,                      { msg: "Unable to empty robot's bin",                               opError: 'DustBinFull'                                      }],
+    [ 611,                      { msg: 'Mapping failed',                                            opError: 'CannotReachTargetArea'                            }],
+    [ 612,                      { msg: 'Mapping failed',                                            opError: 'CannotReachTargetArea'                            }],
+    [ 620,                      { msg: "Dock's cleaning solution empty",                            opError: 'WaterTankEmpty'                                   }],
+    [ 627,                      { msg: 'Something went wrong'                                                                                                   }],
+    [ 629,                      { msg: 'Wet roller not detected',                                   opError: 'MopCleaningPadMissing'                            }],
+    [ 630,                      { msg: 'Wet roller stuck',                                          opError: 'BrushJammed'                                      }],
+    [ 634,                      { msg: 'Unable to return to dock',                                  opError: 'FailedToFindChargingDock'                         }],
+    [ 636,                      { msg: 'Robot stuck',                                               opError: 'Stuck'                                            }],
+    [ 637,                      { msg: "Dock's clean water tank not detected",                      opError: 'WaterTankMissing'                                 }],
+    [ 639,                      { msg: 'Wet roller not detected',                                   opError: 'MopCleaningPadMissing'                            }],
+    [ 645,                      { msg: 'Wet roller not detected',                                   opError: 'MopCleaningPadMissing'                            }],
+    [ 646,                      { msg: 'Wet roller error',                                          opError: 'BrushJammed'                                      }],
+    [ 650,                      { msg: "Robot's dirty water tank not detected",                     opError: 'DirtyWaterTankMissing'                            }],
+    [2000,                      { msg: "Dock's bin full",                                           opError: 'DustBinFull'                                      }],
+    [2003,                      { msg: 'Unable to start scheduled clean',                           opError: 'UnableToStartOrResume'                            }],
+    [2007,                      { msg: 'Mapping failed',                                            opError: 'CannotReachTargetArea'                            }],
+    [2012,                      { msg: 'Unable to reach area',                                      opError: 'CannotReachTargetArea'                            }],
+    [2119,                      { msg: 'Unable to start scheduled clean',                           opError: 'UnableToStartOrResume'                            }],
+    [2123,                      { msg: "Dock's clean water pump error"                                                                                          }],
+    [2124,                      { msg: "Dock's dirty water pump error"                                                                                          }],
+    [2125,                      { msg: 'Robot not charging',                                        chargeFault: 'Unspecified'                                  }],
+    [2126,                      { msg: 'Robot not charging',                                        chargeFault: 'Unspecified'                                  }],
+    [2131,                      { msg: 'Battery temperature too low',                               batFault: 'UnderTemp',  chargeFault: 'BatteryTooCold'       }],
+    [2132,                      { msg: 'Battery temperature too high',                              batFault: 'OverTemp',   chargeFault: 'BatteryTooHot'        }],
+    [2133,                      { msg: 'Battery temperature too low',                               batFault: 'UnderTemp',  chargeFault: 'BatteryTooCold'       }],
+    // https://github.com/thoukydides/matterbridge-dyson-robot/issues/46#issue-5250424565
+    [2100,                      { msg: 'Battery charge required'                                                                                                }],
+    [2101,                      { msg: 'Battery charging'                                                                                                       }],
+    [2103,                      { msg: 'Dock busy'                                                                                                              }],
+    [2104,                      { msg: 'Aborted'                                                                                                                }],
+    [2108,                      { msg: 'Discovery in progress'                                                                                                  }],
+    [2109,                      { msg: 'Cleaning in progress'                                                                                                   }],
+    [2110,                      { msg: 'Cleaning resumed'                                                                                                       }]
+]);
