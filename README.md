@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/homebridge/branding/latest/logos/homebridge-color-round-stylized.png" height="140">
+  <img src="https://raw.githubusercontent.com/rummeyer/homebridge-dyson-vis-nav/main/assets/icon.png" width="100" height="100" alt="">
 </p>
 
 <h1 align="center">homebridge-dyson-vis-nav</h1>
