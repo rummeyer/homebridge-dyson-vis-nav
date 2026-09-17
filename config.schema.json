@@ -8,12 +8,14 @@
     "footerDisplay": "Mock devices for development are set directly in config.json; see the README.",
     "schema": {
         "type": "object",
+        "required": [
+            "name"
+        ],
         "properties": {
             "name": {
                 "title": "Name",
                 "type": "string",
                 "default": "Dyson 360 Vis Nav",
-                "required": true,
                 "description": "Name shown in the Homebridge log."
             },
             "provisioningMethod": {

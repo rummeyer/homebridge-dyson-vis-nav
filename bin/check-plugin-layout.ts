@@ -50,6 +50,7 @@ interface SchemaNode {
     items?:         SchemaNode;
 }
 interface PackageJson {
+    keywords?:          string[];
     files?:             string[];
     main?:              string;
     dependencies?:      Record<string, string>;
@@ -194,6 +195,35 @@ if (existsSync(join(root, indexRel)) && existsSync(join(root, serverRel))) {
               `config.schema.json: property "${item.key}" is hidden but still has a title or `
             + 'description, which the form renders as stray text');
     }
+}
+
+// Homebridge's verification bot rejects both of these, and neither is visible
+// from the running plugin — the first only shows up in the plugin listing, the
+// second only when something validates the schema as JSON Schema.
+{
+    const keywords = pkg.keywords ?? [];
+    check(keywords.includes('homebridge-plugin'),
+          'package.json: "keywords" must contain "homebridge-plugin"');
+    check(keywords.includes('supports-matter') || keywords.includes('supports-hap'),
+          'package.json: "keywords" must declare a transport — "supports-matter" '
+        + 'and/or "supports-hap"');
+
+    // `required` is an array of property names at the object level in JSON
+    // Schema. A boolean on the property itself is an older form-library
+    // convention that the bot treats as an invalid schema.
+    const booleanRequired: string[] = [];
+    const walkRequired = (node: SchemaNode, prefix: string): void => {
+        for (const [name, child] of Object.entries(node.properties ?? {})) {
+            const path = prefix ? `${prefix}.${name}` : name;
+            if ((child as { required?: unknown }).required === true) booleanRequired.push(path);
+            walkRequired(child, path);
+        }
+        if (node.items) walkRequired(node.items, `${prefix}[]`);
+    };
+    walkRequired(schema.schema ?? {}, '');
+    check(booleanRequired.length === 0,
+          `config.schema.json: "required": true on ${booleanRequired.join(', ')} — list the `
+        + 'names in a "required" array on the enclosing object instead');
 }
 
 const files = pkg.files ?? [];
