@@ -30,16 +30,17 @@ export const PLUGIN_URL     = PACKAGE.homepage;
 // package.json: changing the display name must not orphan existing configs.
 export const PLATFORM_NAME  = 'DysonVisNav';
 
-// Default configuration options
+// Default configuration options.
+//
+// Upstream seeds a Dyson account token here from a DYSON_TOKEN environment
+// variable, for its own integration testing. That is deliberately not carried
+// over: an undocumented environment variable that silently supplies credentials
+// is worth removing rather than explaining, and this plugin has one documented
+// way in — the authorisation flow in the settings UI, which stores its token in
+// the plugin's own storage.
 export const DEFAULT_CONFIG: Readonly<Partial<Config>> = {
     whiteList:              [],
     provisioningMethod:     'Remote Account',
-    ...(process.env.DYSON_TOKEN && {
-        dysonAccount: {
-            china:      false,
-            token:      process.env.DYSON_TOKEN
-        }
-    }),
     wildcardTopic:          false,
     simpleModeTagsRvc:      true,
     logMapStyle:            'Off',

@@ -73,6 +73,11 @@ enumerated attribute as a plain `number`, so nothing more is needed.
   operational state after a grace period instead.
 - **Matter events** are not emitted at all: Homebridge 2.4.0 exposes no API for
   them. The corresponding attributes are updated normally.
+- **No `DYSON_TOKEN` environment variable.** Upstream seeds an account token from
+  one in `DEFAULT_CONFIG`, for its own integration testing. An undocumented
+  environment variable that silently supplies credentials is worth removing
+  rather than explaining — Homebridge's verification bot flags it for manual
+  security review, and it has no purpose here. Do not let a sync bring it back.
 
 ---
 
