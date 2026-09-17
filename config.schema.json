@@ -38,9 +38,10 @@
                     "password": {
                         "type": "string"
                     },
-                    "china": {
-                        "type": "boolean",
-                        "default": false
+                    "country": {
+                        "type": "string",
+                        "default": "GB",
+                        "maxLength": 2
                     },
                     "token": {
                         "type": "string"
@@ -219,7 +220,7 @@
                     "notitle": true
                 },
                 {
-                    "key": "dysonAccount.china",
+                    "key": "dysonAccount.country",
                     "type": "hidden",
                     "notitle": true
                 },

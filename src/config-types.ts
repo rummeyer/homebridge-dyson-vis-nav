@@ -11,9 +11,13 @@ export type ProvisioningMethod =
     'Remote Account'
   | 'Mock Devices';
 
-// Dyson account configuration
+// Dyson account configuration.
+//
+// The country selects the API host (mainland China has its own) and supplies
+// the country and culture that per-device endpoints ask for. It replaced a
+// plain "china" flag, which could only ever say which of two hosts to use.
 export interface DysonAccountBase {
-    china:                  boolean;
+    country:                string;
 }
 
 // The password is needed only to exchange the emailed code for a token, and the

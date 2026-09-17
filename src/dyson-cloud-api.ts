@@ -29,11 +29,11 @@ export class DysonCloudAPI {
     constructor(
         readonly log:       AnsiLogger,
         readonly config:    Config,
-        readonly china:     boolean,
+        readonly country:   string,
         public   token?:    string
     ) {
         // Create a user agent
-        this.ua = new DysonCloudAPIUserAgent(log, config, china);
+        this.ua = new DysonCloudAPIUserAgent(log, config, country);
 
         // If a token was provided then set the Bearer header
         if (token) this.ua.setBearerToken(token);
@@ -85,6 +85,6 @@ export class DysonCloudAPI {
     // Create a device-specific cloud API client
     createDeviceClient(log: AnsiLogger, manifest: DysonManifestDevice): DysonCloudAPIDevice {
         assertIsDefined(this.token);
-        return new DysonCloudAPIDevice(log, this.config, this.china, this.token, manifest);
+        return new DysonCloudAPIDevice(log, this.config, this.country, this.token, manifest);
     }
 }

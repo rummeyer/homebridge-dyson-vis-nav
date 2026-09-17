@@ -15,6 +15,7 @@ import {
 } from './dyson-cloud-types.js';
 import NodePersist from 'node-persist';
 import { DysonCloudAPI } from './dyson-cloud-api.js';
+import { DEFAULT_COUNTRY } from './settings.js';
 import { assertIsDefined, columns, formatMilliseconds, MS, plural } from './utils.js';
 import { isSupportedModel } from './dyson-device.js';
 import { DeviceConfigMqtt, DeviceConfigRemoteMqtt } from './dyson-mqtt-client-live.js';
@@ -72,12 +73,12 @@ export class DysonCloud<T extends Config = Config> {
 
     // Create a Dyson API client, with Bearer token if available
     async createApi(): Promise<DysonCloudAPI> {
-        let china = false;
+        let country = DEFAULT_COUNTRY;
         let token: string | undefined;
 
         // Attempt to use the configuration to configure the API client
         if (this.account) {
-            china = this.account.china;
+            country = this.account.country;
             if ('token' in this.account) {
                 // Configuration provides the Bearer token explicitly
                 token = this.account.token;
@@ -98,7 +99,7 @@ export class DysonCloud<T extends Config = Config> {
         }
 
         // Create the API client
-        const api = new DysonCloudAPI(this.log, this.config, china, token);
+        const api = new DysonCloudAPI(this.log, this.config, country, token);
 
         // Perform a dummy version read before using the API for anything else
         await api.getVersion();

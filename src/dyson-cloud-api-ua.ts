@@ -60,11 +60,12 @@ export class DysonCloudAPIUserAgent {
     constructor(
         readonly log:       AnsiLogger,
         readonly config:    Config,
-        readonly china:     boolean
+        readonly country:   string
     ) {
-        // Create an HTTP client
+        // Create an HTTP client. Mainland China is served by its own host; every
+        // other country uses the global one.
         this.client = new Client(
-            china ? DYSON_API_URL_CHINA : DYSON_API_URL_GLOBAL,
+            country.toUpperCase() === 'CN' ? DYSON_API_URL_CHINA : DYSON_API_URL_GLOBAL,
             {
                 bodyTimeout:    TIMEOUT,
                 headersTimeout: TIMEOUT,

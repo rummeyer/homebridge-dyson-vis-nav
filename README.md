@@ -170,7 +170,7 @@ Everything below has a sensible default; you can ignore all of it.
     "dysonAccount": {
         "email": "you@example.com",
         "password": "your-mydyson-password",
-        "china": false
+        "country": "GB"
     },
     "whiteList": [],
     "unreachableTimeout": 120,
@@ -178,7 +178,12 @@ Everything below has a sensible default; you can ignore all of it.
 }
 ```
 
-Set `"china": true` if your MyDyson account is registered in China.
+Set `"country"` to the two-letter code for the country your MyDyson account
+belongs to. It selects the Dyson server — mainland China has its own — and the
+language that per-device requests ask for.
+
+Configurations from before this field are migrated on startup: a `"china": true`
+flag becomes `"CN"`, and anything else becomes `"GB"`.
 </details>
 
 ---

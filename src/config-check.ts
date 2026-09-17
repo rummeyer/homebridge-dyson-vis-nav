@@ -7,13 +7,16 @@ import { AnsiLogger, LogLevel } from './logger.js';
 import { checkers } from './ti/config-types.js';
 import { CheckerT, IErrorDetail } from 'ts-interface-checker';
 import { deepMerge, getValidationTree } from './utils.js';
-import { DEFAULT_CONFIG, PLUGIN_NAME } from './settings.js';
+import { DEFAULT_CONFIG, DEFAULT_COUNTRY, PLUGIN_NAME } from './settings.js';
 import { Config, DysonAccountLogin, ProvisioningMethod } from './config-types.js';
 import { inspect } from 'util';
 import { INSPECT_VERBOSE } from './logger-options.js';
 
 // Check that the configuration is valid
 export function checkConfiguration(log: AnsiLogger, config: PlatformConfig): asserts config is Config & PlatformConfig {
+    // Bring a pre-country configuration forward before anything validates it
+    normaliseAccountCountry(log, config);
+
     // Apply default values
     Object.assign(config, deepMerge(DEFAULT_CONFIG, config));
 
@@ -38,6 +41,25 @@ export function checkConfiguration(log: AnsiLogger, config: PlatformConfig): ass
         log.warn('Unsupported fields in plugin configuration will be ignored:');
         logCheckerValidation(log, config, LogLevel.WARN, strictValidation);
     }
+}
+
+// Ensure the account carries a country, replacing the "china" flag it succeeded.
+//
+// Silent for the common case: almost every installation had the flag unset or
+// absent, and naming a field those users never chose would be noise. Switching
+// a Chinese account over is worth a line, because it is the one case where
+// getting this wrong sends the login to the wrong host.
+function normaliseAccountCountry(log: AnsiLogger, config: PlatformConfig): void {
+    const account = config.dysonAccount as Record<string, unknown> | undefined;
+    if (!account) return;
+
+    const china = account.china === true;
+    delete account.china;
+    if (typeof account.country === 'string' && account.country.length) return;
+
+    const country = china ? 'CN' : DEFAULT_COUNTRY;
+    account.country = country;
+    if (china) log.info(`MyDyson account country set to ${country} from the previous China setting`);
 }
 
 // Extract a validated dysonAccount from the (possibly incomplete) configuration

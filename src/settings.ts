@@ -38,6 +38,9 @@ export const PLATFORM_NAME  = 'DysonVisNav';
 // is worth removing rather than explaining, and this plugin has one documented
 // way in — the authorisation flow in the settings UI, which stores its token in
 // the plugin's own storage.
+// Used when a configuration predates the country field, and as the schema default
+export const DEFAULT_COUNTRY = 'GB';
+
 export const DEFAULT_CONFIG: Readonly<Partial<Config>> = {
     whiteList:              [],
     provisioningMethod:     'Remote Account',

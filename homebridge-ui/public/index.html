@@ -34,9 +34,13 @@
         <input type="password" class="form-control" id="dyPassword" autocomplete="current-password">
     </div>
 
-    <div class="form-check dy-check">
-        <input type="checkbox" class="form-check-input" id="dyChina">
-        <label class="form-check-label" for="dyChina">Account registered in China</label>
+    <div class="dy-field">
+        <label for="dyCountry">Country</label>
+        <input type="text" class="form-control" id="dyCountry" maxlength="2"
+               style="max-width:6rem" placeholder="GB" autocapitalize="characters">
+        <div class="dy-hint" style="margin:.25rem 0 0">Two-letter code for the country your
+            MyDyson account belongs to. It selects the Dyson server and the language
+            per-device requests ask for.</div>
     </div>
 
     <div class="dy-auth">
@@ -93,7 +97,7 @@
         Object.assign(configs[0].dysonAccount, {
             email:    $('dyEmail').value.trim(),
             password: $('dyPassword').value,
-            china:    $('dyChina').checked
+            country:  $('dyCountry').value.trim().toUpperCase() || 'GB'
         });
         await homebridge.updatePluginConfig(configs);
         return configs[0].dysonAccount;
@@ -144,11 +148,12 @@
         const account = config.dysonAccount;
         $('dyEmail').value    = account.email    ?? '';
         $('dyPassword').value = account.password ?? '';
-        $('dyChina').checked  = account.china === true;
+        // 'china' predates the country field; a stored flag still selects CN.
+        $('dyCountry').value = account.country ?? (account.china === true ? 'CN' : 'GB');
         await refreshStatus();
     };
 
-    for (const id of ['dyEmail', 'dyPassword', 'dyChina']) {
+    for (const id of ['dyEmail', 'dyPassword', 'dyCountry']) {
         $(id).addEventListener('change', () => { void refreshStatus(); });
     }
 

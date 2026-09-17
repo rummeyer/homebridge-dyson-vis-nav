@@ -30,8 +30,14 @@ import { Dyson360CleaningStrategy } from './dyson-360-types.js';
 import { assertIsDefined } from './utils.js';
 
 // Default locale
-const DEFAULT_COUNTRY   = 'GB';
-const DEFAULT_LANGUAGE  = 'en-GB';
+// Language codes for the countries whose own language is not English. Anything
+// missing falls back to English, which is what these endpoints did for every
+// country before the account carried one.
+const COUNTRY_LANGUAGE: Record<string, string> = {
+    AT: 'de', BE: 'nl', CH: 'de', CN: 'zh', DE: 'de', ES: 'es', FI: 'fi',
+    FR: 'fr', IT: 'it', JP: 'ja', KR: 'ko', NL: 'nl', NO: 'no', PL: 'pl',
+    PT: 'pt', RU: 'ru', SE: 'sv', TR: 'tr', TW: 'zh'
+};
 
 // Dyson cloud API client for a single device
 export class DysonCloudAPIDevice {
@@ -39,16 +45,21 @@ export class DysonCloudAPIDevice {
     // User agent used for all requests
     readonly ua: DysonCloudAPIUserAgent;
 
+    // Culture for the endpoints that ask for one, derived from the country
+    readonly culture: string;
+
     // Construct a new Dyson cloud API client
     constructor(
         readonly log:       AnsiLogger,
         readonly config:    Config,
-        readonly china:     boolean,
+        readonly country:   string,
         readonly token:     string,
         readonly manifest:  DysonManifestDevice
     ) {
         // Create an authenticated user agent
-        this.ua = new DysonCloudAPIUserAgent(log, config, china);
+        this.ua = new DysonCloudAPIUserAgent(log, config, country);
+        const upper = country.toUpperCase();
+        this.culture = `${COUNTRY_LANGUAGE[upper] ?? 'en'}-${upper}`;
         this.ua.setBearerToken(token);
     }
 
@@ -79,7 +90,7 @@ export class DysonCloudAPIDevice {
     }
 
     // Check the registration status of the device
-    async getOwnership(countryCode = DEFAULT_COUNTRY): Promise<DysonOwnershipStatus> {
+    async getOwnership(countryCode = this.country.toUpperCase()): Promise<DysonOwnershipStatus> {
         const path = `/v1/userregistration/ownership?country=${countryCode}&serial=${this.serialNumber}`;
         const response = await this.ua.getJSON(checkers.DysonOwnershipResponse, path);
         return response.deviceStatus;
@@ -100,7 +111,7 @@ export class DysonCloudAPIDevice {
     }
 
     // Retrieve the cleaning history for the device (360 Eye only)
-    getCleaningHistory360(languageCode = DEFAULT_LANGUAGE): Promise<Dyson360CleanHistoryResponse> {
+    getCleaningHistory360(languageCode = this.culture): Promise<Dyson360CleanHistoryResponse> {
         const path = `/v1/assets/devices/${this.serialNumber}/cleanhistory?culture=${languageCode}`;
         return this.ua.getJSON(checkers360.Dyson360CleanHistoryResponse, path);
     }

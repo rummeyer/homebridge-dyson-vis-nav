@@ -74,7 +74,7 @@ class DysonUiServer extends HomebridgePluginUiServer {
 
         const { log } = this.createLogger();
         try {
-            const account = { email, password: '', china: request.account.china === true };
+            const account = { email, password: '', country: request.account.country ?? 'GB' };
             const api = new DysonCloudAuth(log, makeAuthConfig(), persist, account);
             const devices = await (await api.api).getManifest();
             return {
@@ -96,14 +96,14 @@ class DysonUiServer extends HomebridgePluginUiServer {
     // Validate the account details supplied by the browser
     getAccount(request) {
         const account = request?.account ?? {};
-        const { email, password, china } = account;
+        const { email, password, country } = account;
         if (typeof email !== 'string' || !email.length) {
             throw new RequestError('Enter the email address of your MyDyson account in the configuration form below, then try again.');
         }
         if (typeof password !== 'string' || !password.length) {
             throw new RequestError('Enter the password of your MyDyson account in the configuration form below, then try again.');
         }
-        return { email, password, china: china === true };
+        return { email, password, country: (country ?? 'GB').toUpperCase() };
     }
 
     // Ask Dyson to email a one-time code
