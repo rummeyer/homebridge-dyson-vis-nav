@@ -39,7 +39,7 @@ Everything runs through your own Homebridge. Nothing is sent anywhere except to 
 | **Robot** | Dyson 360 Vis Nav, added to your MyDyson account |
 | **Homebridge** | 2.4.0 or newer |
 | **Node.js** | 22, 24 or 26 |
-| **Matter** | **Must be enabled in Homebridge** — see step 1 |
+| **Matter** | **Must be enabled** on the bridge the plugin runs on — see step 2 |
 | **Apple Home** | iOS 18.4 / iPadOS 18.4 / tvOS 18.4 or newer, on every device that should control it |
 
 ### Why Matter has to be on
@@ -50,16 +50,11 @@ Homebridge 2.0 speaks Matter alongside HomeKit, so switching it on costs you not
 
 ---
 
-## Step 1 — Turn on Matter in Homebridge
-
-1. Open the Homebridge UI.
-2. Go to **Settings** (the gear icon, top right).
-3. Find **Matter** and switch it on.
-4. Click **Save**, then **Restart Homebridge**.
-
-## Step 2 — Install the plugin
+## Step 1 — Install the plugin
 
 Open the Homebridge UI, go to **Plugins**, search for `homebridge-dyson-vis-nav`, and click **Install**.
+
+> Newly published plugins take a while to appear in the search. If it does not come up, type the **full name** — the Homebridge UI looks anything beginning with `homebridge-` up directly, bypassing the search index.
 
 <details>
 <summary>Installing from the command line instead</summary>
@@ -72,6 +67,20 @@ sudo hb-service restart
 ```
 
 `hb-service add homebridge-dyson-vis-nav` works too. It does **not** accept URLs or file paths, only names from npm.
+</details>
+
+## Step 2 — Give it a child bridge with Matter
+
+Matter has to be enabled on whichever bridge this plugin runs on. Putting the plugin in its own **child bridge** and enabling Matter there is the tidier way round: your main bridge keeps running exactly as it does today, and the robot stays isolated from your other accessories.
+
+1. In the Homebridge UI, go to **Plugins** and open the ⋮ menu next to **Dyson 360 Vis Nav**.
+2. Choose **Bridge Settings**, switch the child bridge on, and enable **Matter** for it.
+3. Save, then restart Homebridge.
+
+<details>
+<summary>Enabling Matter on the main bridge instead</summary>
+
+You can also switch Matter on globally, under **Settings** → **Matter**, and skip the child bridge. It works the same way; it just turns Matter on for the whole instance rather than for this plugin alone.
 </details>
 
 ## Step 3 — Connect your MyDyson account
@@ -177,7 +186,7 @@ Set `"china": true` if your MyDyson account is registered in China.
 ## If something goes wrong
 
 **The plugin logs an error about Matter and stops.**
-Matter is not switched on. Go back to step 1. A robot vacuum has no HomeKit equivalent, so there is nothing the plugin can do without it.
+Matter is not switched on for the bridge this plugin runs on. Go back to step 2 — note that enabling it on the main bridge does not enable it for a plugin sitting in a child bridge, or the other way round. A robot vacuum has no HomeKit equivalent, so there is nothing the plugin can do without it.
 
 **The robot does not appear in the Home app.**
 It has its own pairing code and is not part of your Homebridge bridge — see step 4. Adding the Homebridge bridge again will not bring it in.
