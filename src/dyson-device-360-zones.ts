@@ -18,7 +18,8 @@ import {
 } from './dyson-360-cloud-types.js';
 import { ServiceArea } from './matter-clusters.js';
 import { SelectAreaError } from './error-360.js';
-import { MatterAccessory360 as Endpoint360, formatAreaName } from './matter-360.js';
+import { formatAreaName } from './matter-360.js';
+import { DysonAccessory360 as Endpoint360 } from './accessory-360.js';
 import { Device360CommandHandlers } from './dyson-device-360-commands.js';
 import { logError } from './log-error.js';
 

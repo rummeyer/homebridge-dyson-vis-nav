@@ -39,6 +39,12 @@ export class PlatformDyson implements DynamicPlatformPlugin {
     // Active devices
     devices: DysonDevice[] = [];
 
+    // HAP accessories restored from the Homebridge cache
+    readonly cachedAccessories: PlatformAccessory[] = [];
+
+    // Devices that could not be created, which suppresses cache tidying
+    deviceFailures = 0;
+
     // Constructor
     constructor(log: Logging, config: PlatformConfig, readonly api: API) {
         this.log = new FilterLogger(adaptLogger(log));
@@ -60,11 +66,12 @@ export class PlatformDyson implements DynamicPlatformPlugin {
 
     // Restore a cached HAP accessory.
     //
-    // This plugin publishes the robot vacuum as a Matter accessory rather than
-    // a HAP one, so there is nothing to restore. Homebridge still requires the
-    // method to exist on a dynamic platform.
+    // Homebridge calls this before it has finished launching, so the accessories
+    // are only collected here. Whether any of them is adopted depends on how the
+    // robot is published, which is not decided until then.
     configureAccessory(accessory: PlatformAccessory): void {
-        this.log.debug(`Ignoring cached HAP accessory: ${accessory.displayName}`);
+        this.log.debug(`Restoring cached HAP accessory: ${accessory.displayName}`);
+        this.cachedAccessories.push(accessory);
     }
 
     // Create and register the devices once Homebridge has finished launching
@@ -72,14 +79,16 @@ export class PlatformDyson implements DynamicPlatformPlugin {
         try {
             this.log.info(`Starting ${PLUGIN_NAME}`);
 
-            // A robot vacuum can only be represented as a Matter device, so
-            // there is nothing this plugin can do without Matter enabled.
+            // A robot vacuum only exists as a device type in Matter. Without it
+            // the robot is still published, as the switch, battery and problem
+            // sensor that HomeKit can represent, but the cleaning modes, zones
+            // and pause/resume controls have nowhere to go.
             if (!this.api.isMatterEnabled()) {
-                this.log.error('Matter is not enabled for this Homebridge bridge.');
-                this.log.error('The Dyson 360 Vis Nav is exposed as a Matter robot vacuum cleaner,'
-                             + ' which has no HomeKit (HAP) equivalent, so this plugin requires Matter.');
-                this.log.error('Enable Matter in the Homebridge settings, then restart Homebridge.');
-                return;
+                this.log.warn('Matter is not enabled for this Homebridge bridge.');
+                this.log.warn('A robot vacuum has no HomeKit (HAP) equivalent, so each robot is exposed as a switch'
+                            + ' that starts a clean and sends it back to its dock, plus its battery and a problem sensor.');
+                this.log.warn('Enable Matter in the Homebridge settings, then restart Homebridge,'
+                            + ' to expose it as a full robot vacuum cleaner instead.');
             }
 
             // Initialise persistent storage
@@ -104,9 +113,12 @@ export class PlatformDyson implements DynamicPlatformPlugin {
                 break;
             }
 
-            // Create and register a Matter accessory for each Dyson device
+            // Create and register an accessory for each Dyson device
             await Promise.all(mappedDevices.map(async deviceConfig => this.createDevice(deviceConfig)));
             this.log.info(`Registered ${this.devicesDescription}`);
+
+            // Remove any cached HAP accessories that are no longer published
+            this.removeStaleAccessories();
 
             // Configure and start polling the devices
             await Promise.all(this.devices.map(async device => {
@@ -139,13 +151,39 @@ export class PlatformDyson implements DynamicPlatformPlugin {
             const device = await createDysonDevice(
                 deviceLog, this.config, this.api, this.persist, deviceConfig, deviceApi);
 
-            // Register the Matter accessory with Homebridge
+            // Register the accessory with Homebridge
             const accessory = device.getAccessory();
-            await accessory.register(PLUGIN_NAME, PLATFORM_NAME);
+            await accessory.register(PLUGIN_NAME, PLATFORM_NAME, this.cachedAccessories);
             this.devices.push(device);
         } catch (err) {
+            ++this.deviceFailures;
             logError(deviceLog, 'Creating device', err);
         }
+    }
+
+    // Remove cached HAP accessories that this plugin no longer publishes.
+    //
+    // With Matter enabled every one of them is stale, because the robot is then
+    // its own Matter node and this plugin publishes nothing over HAP. Otherwise
+    // only the accessories no device claimed are stale.
+    //
+    // A device that failed to be created is indistinguishable from one that is
+    // gone, so nothing is removed after a failure: a cloud outage must not cost
+    // the user the room, name and automations attached to an accessory.
+    removeStaleAccessories(): void {
+        if (this.deviceFailures) {
+            this.log.debug('Not tidying cached HAP accessories after a device failure');
+            return;
+        }
+        const published = new Set(this.devices.map(device => device.getAccessory().uuid));
+        const stale = this.api.isMatterEnabled() ? this.cachedAccessories
+            : this.cachedAccessories.filter(accessory => !published.has(accessory.UUID));
+        if (!stale.length) return;
+
+        for (const accessory of stale) {
+            this.log.info(`Removing HomeKit accessory no longer published by this plugin: ${accessory.displayName}`);
+        }
+        this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, stale);
     }
 
     // Check a device serial number against the allow list.

@@ -13,12 +13,14 @@ import { BasicInformation } from './matter-clusters.js';
 import { ifValueChanged } from './decorator-changed.js';
 import { logError } from './log-error.js';
 import { RvcCleanModeLabels } from './matter-360-modes.js';
+import { MatterAccessory360 } from './matter-360.js';
+import { HapAccessory360 } from './hap-360.js';
 import {
-    MatterAccessory360 as Endpoint360,
+    DysonAccessory360 as Endpoint360,
     EndpointOptions360,
     UpdatePowerSource360,
     UpdateRvcOperationalState360
-} from './matter-360.js';
+} from './accessory-360.js';
 import { PLUGIN_URL, VENDOR_ID, VENDOR_NAME } from './settings.js';
 import { RvcCleanMode360, RvcRunMode360 } from './matter-360-modes.js';
 import { PowerSource, RvcOperationalState } from './matter-clusters.js';
@@ -156,7 +158,12 @@ export abstract class DysonDevice360Base
             this.updateClusterAttributes(this.mqtt.status));
     }
 
-    // Create the Matter accessory for this device
+    // Create the accessory for this device.
+    //
+    // A robot vacuum exists as a device type in Matter only, so that is what is
+    // published whenever the bridge has Matter switched on. Without it the robot
+    // is published over HAP instead, as the switch, battery and problem sensor
+    // that HomeKit can actually represent.
     makeAccessory(): Endpoint360 {
         const rvcCleanModeLabels: RvcCleanModeLabels =
             this.getPowerLevelMaps().map(([, mode, label]) => [mode, label]);
@@ -190,7 +197,9 @@ export abstract class DysonDevice360Base
         };
 
         // Create the accessory and attach a command handler
-        const endpoint = new Endpoint360(this.log, this.config, this.hbApi, endpointOptions);
+        const endpoint = this.hbApi.isMatterEnabled()
+            ? new MatterAccessory360(this.log, this.config, this.hbApi, endpointOptions)
+            : new HapAccessory360(this.log, this.config, this.hbApi, endpointOptions);
         this.attachCommandHandlers(endpoint);
         return endpoint;
     }
@@ -205,7 +214,7 @@ export abstract class DysonDevice360Base
     // Indicates whether the device supports Service Area map features
     supportsMaps = (): boolean => false;
 
-    // Retrieve the Matter accessory representing this device
+    // Retrieve the accessory representing this device
     override getAccessory(): Endpoint360 {
         return this.endpoint ??= this.makeAccessory();
     }

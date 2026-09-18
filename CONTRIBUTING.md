@@ -220,6 +220,24 @@ RVC Operational State: Docked (66) → Running (1) → SeekingCharger (64) → C
 Battery status: 100%, Ok (0), Active (1), and IsAtFullCharge (2)
 ```
 
+Leaving `bridge.matter` out, or setting `enabled: false`, exercises the other
+half: the robot is then published over HAP as a switch, a battery and a problem
+sensor. What to look for:
+
+```
+Matter is not enabled for this Homebridge bridge.
+Published Vis Nav Test to Homebridge as a HomeKit switch, battery and problem sensor
+Switch: On (Cleaning (1))
+Problem: DustBinMissing (66): Bin missing or not detected
+```
+
+Restarting with the same config must log `Restored ... from the Homebridge
+cache` and leave a single entry in `<config dir>/accessories/cachedAccessories`
+— a second entry means the accessory was republished rather than adopted, which
+in a real installation costs the user its room and automations. Enabling Matter
+afterwards must log `Removing HomeKit accessory no longer published by this
+plugin` and empty that file again.
+
 Two traps that cost real time:
 
 - A stale Homebridge process **renames itself to plain `homebridge`**, so

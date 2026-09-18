@@ -10,7 +10,7 @@ import { Constructor } from './utils.js';
 import { Changed } from './decorator-changed.js';
 import { createHash } from 'crypto';
 import { DeviceConfigMqtt } from './dyson-mqtt-client-live.js';
-import { MatterAccessory360 } from './matter-360.js';
+import { DysonAccessory360 } from './accessory-360.js';
 import { DysonCloudAPIDevice } from './dyson-cloud-api-device.js';
 import { DysonDeviceCompatibility } from './dyson-device-compatibility.js';
 
@@ -74,8 +74,8 @@ export abstract class DysonDevice<MQTT extends DysonMqttLike = DysonMqttLike> {
         this.compatibility.logCompatibility(this.compatibilityWarning);
     }
 
-    // Retrieve the Matter accessory representing this device
-    abstract getAccessory(): MatterAccessory360;
+    // Retrieve the accessory representing this device
+    abstract getAccessory(): DysonAccessory360;
 
     // Start the device after the accessory has been registered
     abstract start(): Promise<void>;

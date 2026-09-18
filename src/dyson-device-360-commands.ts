@@ -4,7 +4,7 @@
 
 import { AnsiLogger } from './logger.js';
 import { DysonMqtt360, DysonMqtt360Action } from './dyson-mqtt-360.js';
-import { MatterAccessory360 as Endpoint360 } from './matter-360.js';
+import { DysonAccessory360 as Endpoint360 } from './accessory-360.js';
 import { RvcCleanMode360, RvcRunMode360 } from './matter-360-modes.js';
 import { Dyson360CleaningProgramme, Dyson360State } from './dyson-360-types.js';
 import { CN, CV, RI } from './logger-options.js';

@@ -5,7 +5,7 @@
 <h1 align="center">homebridge-dyson-vis-nav</h1>
 
 <p align="center">
-  Control your <b>Dyson 360 Vis Nav</b> from the Apple Home app &mdash; as a real robot vacuum, not a switch in disguise.
+  Control your <b>Dyson 360 Vis Nav</b> from the Apple Home app &mdash; as a real robot vacuum, or as a switch if it doesn't Matter.
 </p>
 
 <p align="center">
@@ -30,6 +30,8 @@ Your robot appears in the Home app as a genuine **robot vacuum cleaner**, with t
 - **Room cleaning**, for the rooms you have mapped in the MyDyson app
 - **Siri**: *"Hey Siri, start the vacuum"*, *"Hey Siri, send the vacuum to its dock"*
 
+That is what you get with Matter enabled. Without it you still get a switch, a battery and a problem sensor — see [Why Matter matters](#why-matter-matters).
+
 Everything runs through your own Homebridge. Nothing is sent anywhere except to Dyson, exactly as the MyDyson app does.
 
 ## Before you start
@@ -39,12 +41,20 @@ Everything runs through your own Homebridge. Nothing is sent anywhere except to 
 | **Robot** | Dyson 360 Vis Nav, added to your MyDyson account |
 | **Homebridge** | 2.4.0 or newer |
 | **Node.js** | 22, 24 or 26 |
-| **Matter** | **Must be enabled** on the bridge the plugin runs on — see step 2 |
+| **Matter** | **Strongly recommended**, on the bridge the plugin runs on — see step 2. Without it the robot appears as a switch rather than as a robot vacuum |
 | **Apple Home** | iOS 18.4 / iPadOS 18.4 / tvOS 18.4 or newer, on every device that should control it |
 
-### Why Matter has to be on
+### Why Matter matters
 
-Apple never added robot vacuums to HomeKit itself. It added them to the Home app **through Matter**, which is why this plugin needs it. With Matter switched off, the plugin cannot expose your robot at all, and says so in the log rather than pretending otherwise.
+Apple never added robot vacuums to HomeKit itself. It added them to the Home app **through Matter**, which is why this plugin asks for it.
+
+With Matter switched off the plugin still works, but HomeKit has no robot vacuum for your robot to be, so it appears as the nearest things HomeKit does have:
+
+- a **switch** — on starts a clean, off sends the robot back to its dock
+- its **battery**, with charging state and low-battery warning
+- a **problem sensor** — a contact sensor that opens when the robot needs attention, which an automation can react to
+
+Cleaning modes, room cleaning, and pause and resume have no HomeKit equivalent, and are left out rather than bent onto a control that would mean something else. The log says which of the two you are getting, every time the plugin starts.
 
 Homebridge 2.0 speaks Matter alongside HomeKit, so switching it on costs you nothing: your other accessories carry on exactly as before.
 
@@ -190,8 +200,11 @@ flag becomes `"CN"`, and anything else becomes `"GB"`.
 
 ## If something goes wrong
 
-**The plugin logs an error about Matter and stops.**
-Matter is not switched on for the bridge this plugin runs on. Go back to step 2 — note that enabling it on the main bridge does not enable it for a plugin sitting in a child bridge, or the other way round. A robot vacuum has no HomeKit equivalent, so there is nothing the plugin can do without it.
+**The plugin warns about Matter and publishes a switch.**
+Matter is not switched on for the bridge this plugin runs on, so the robot is published as a switch, a battery and a problem sensor rather than as a robot vacuum. Go back to step 2 — note that enabling it on the main bridge does not enable it for a plugin sitting in a child bridge, or the other way round.
+
+**The switch disappeared after I enabled Matter.**
+That is deliberate. With Matter on, the robot is published as its own Matter accessory, and the switch it replaces is removed so that one robot does not leave you with two tiles. The Matter accessory has its own pairing code — see step 4.
 
 **The robot does not appear in the Home app.**
 It has its own pairing code and is not part of your Homebridge bridge — see step 4. Adding the Homebridge bridge again will not bring it in.

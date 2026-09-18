@@ -6,6 +6,7 @@ import type {
     API,
     MatterAccessory,
     MatterAPI,
+    PlatformAccessory,
     PlatformName,
     PluginIdentifier
 } from 'homebridge';
@@ -20,7 +21,6 @@ import {
 } from './matter-clusters.js';
 import {
     RvcCleanMode360,
-    RvcCleanModeOptions,
     RvcRunMode360,
     RVC_RUN_MODE_SUPPORTED,
     rvcCleanModeSupported
@@ -30,75 +30,19 @@ import {
     RvcOperationalStateError,
     SelectAreaError
 } from './error-360.js';
-import { Changed, ifValueChanged } from './decorator-changed.js';
+import { ifValueChanged } from './decorator-changed.js';
+import {
+    DysonAccessory360,
+    formatEnumLog,
+    EndpointOptions360,
+    UpdatePowerSource360,
+    UpdateRvcOperationalState360,
+    UpdateServiceArea360
+} from './accessory-360.js';
 import { logError } from './log-error.js';
-import { assertIsDefined, formatList, formatSeconds, MaybePromise, MS, plural } from './utils.js';
+import { assertIsDefined, formatList, formatSeconds, MS, plural } from './utils.js';
 import { AN, AV, CN, RI } from './logger-options.js';
 import { isDeepStrictEqual } from 'util';
-
-// Details used to identify the device to Matter controllers
-export interface BasicInformationOptions {
-    uniqueId:           string;
-    nodeLabel:          string;
-    partNumber?:        string;
-    productAppearance?: BasicInformation.ProductAppearance;
-    productId:          number;
-    productLabel?:      string;
-    productName:        string;
-    productUrl?:        string;
-    serialNumber:       string;
-    softwareVersion?:   string;
-    vendorId:           number;
-    vendorName:         string;
-}
-
-// Device-specific accessory configuration
-export interface EndpointOptions360 {
-    id:                 string;
-    deviceName:         string;
-    basicInformation:   BasicInformationOptions;
-    powerSource:        { batteryPartNumber: string };
-    rvcCleanMode:       RvcCleanModeOptions;
-    supportsMaps:       boolean;
-}
-
-// Updates to the Power Source cluster attributes
-export interface UpdatePowerSource360 {
-    activeBatChargeFaults:  PowerSource.BatChargeFault[];
-    activeBatFaults:        PowerSource.BatFault[];
-    batChargeLevel:         PowerSource.BatChargeLevel;
-    batChargeState:         PowerSource.BatChargeState;
-    batPercentRemaining:    number | null; // ×2, e.g. 200 for 100%
-    status:                 PowerSource.PowerSourceStatus;
-}
-
-// Updates to the RVC Operational State cluster
-export interface UpdateRvcOperationalState360 {
-    isActive:               boolean;
-    operationalError:       RvcOperationalState.ErrorStateStruct;
-    operationalState:       RvcOperationalState.OperationalState;
-}
-
-// Updates to the Service Area cluster
-export interface UpdateServiceArea360 {
-    currentArea:            number | null;
-    progress:               ServiceArea.Progress[];
-    selectedAreas:          number[];
-    supportedAreas:         ServiceArea.Area[];
-    supportedMaps:          ServiceArea.Map[];
-}
-
-// Commands that the device layer can handle
-export interface EndpointCommands360 {
-    ChangeRunMode:   (newMode: RvcRunMode360)   => MaybePromise;
-    ChangeCleanMode: (newMode: RvcCleanMode360) => MaybePromise;
-    Pause:           ()                         => MaybePromise;
-    Resume:          ()                         => MaybePromise;
-    GoHome:          ()                         => MaybePromise;
-    SelectAreas:     (newAreas: number[])       => MaybePromise;
-}
-type EndpointCommand360Args<T extends keyof EndpointCommands360> = Parameters<EndpointCommands360[T]>;
-type EndpointHandler360<T extends keyof EndpointCommands360> = (...args: EndpointCommand360Args<T>) => MaybePromise;
 
 // Battery constants for the Power Source cluster
 const BATTERY_CAPACITY_MAH = 6600;
@@ -110,19 +54,13 @@ const BATTERY_CAPACITY_MAH = 6600;
 // declarative accessory descriptor and applies later changes through
 // `updateAccessoryState`, so the cluster construction and the update methods
 // are split accordingly. The attribute semantics are unchanged.
-export class MatterAccessory360 {
-
-    // Decorator support
-    changed: Changed;
+export class MatterAccessory360 extends DysonAccessory360 {
 
     // Matter accessory identifier
-    readonly uuid: string;
+    override readonly uuid: string;
 
     // Start time of the most recent activity
     startActive = 0;
-
-    // Registered command handlers
-    readonly commands: Partial<EndpointCommands360> = {};
 
     // Whether the accessory has been registered with Homebridge
     private registered = false;
@@ -141,35 +79,15 @@ export class MatterAccessory360 {
 
     // Construct a new accessory
     constructor(
-        readonly log:       AnsiLogger,
+        log:                AnsiLogger,
         readonly config:    Config,
         readonly api:       API,
         readonly options:   EndpointOptions360
     ) {
+        super(log);
         assertIsDefined(api.matter);
         this.matter = api.matter;
         this.uuid   = api.hap.uuid.generate(options.id);
-        this.changed = new Changed(log);
-    }
-
-    // Set a command handler
-    setCommandHandler360<Command extends keyof EndpointCommands360>(
-        command: Command,
-        handler: EndpointCommands360[Command]
-    ): this {
-        if (this.commands[command]) throw new Error(`Handler already registered for command ${command}`);
-        this.commands[command] = handler;
-        return this;
-    }
-
-    // Execute a command handler
-    async executeCommand<Command extends keyof EndpointCommands360>(
-        command:    Command,
-        ...args:    EndpointCommand360Args<Command>
-    ): Promise<void> {
-        const handler = this.commands[command];
-        if (!handler) throw new Error(`${command} not implemented`);
-        await (handler as EndpointHandler360<Command>)(...args);
     }
 
     // Build the accessory descriptor passed to Homebridge
@@ -285,7 +203,11 @@ export class MatterAccessory360 {
     // bridge, and Homebridge reports the outcome of that publish separately
     // (look for "External Matter accessory published" in the log). This promise
     // resolving means the accessory was accepted, not that its node is up.
-    async register(pluginIdentifier: PluginIdentifier, platformName: PlatformName): Promise<void> {
+    override async register(
+        pluginIdentifier:   PluginIdentifier,
+        platformName:       PlatformName,
+        _cached?:           PlatformAccessory[]
+    ): Promise<void> {
         await this.matter.registerPlatformAccessories(pluginIdentifier, platformName, [this.describe()]);
         this.registered = true;
         this.log.info(`Submitted ${AV}${this.options.deviceName}${RI} to Homebridge`
@@ -314,14 +236,14 @@ export class MatterAccessory360 {
     // has been silent for longer than the configured timeout, its activity is
     // reported as unknown rather than left at whatever was last seen.
     @ifValueChanged
-    updateReachable(reachable: boolean): Promise<void> {
+    override updateReachable(reachable: boolean): Promise<void> {
         this.log.info(`${AN}Reachable${RI}: ${AV}${reachable}${RI}`);
         return Promise.resolve();
     }
 
     // Update the Power Source cluster attributes when required
     @ifValueChanged
-    async updatePowerSource(attributes: UpdatePowerSource360): Promise<void> {
+    override async updatePowerSource(attributes: UpdatePowerSource360): Promise<void> {
         const { status, batPercentRemaining, batChargeLevel, batChargeState,
             activeBatChargeFaults, activeBatFaults } = attributes;
         const logBattery = [
@@ -353,21 +275,21 @@ export class MatterAccessory360 {
 
     // Update the RVC Run Mode cluster attributes when required
     @ifValueChanged
-    async updateRvcRunMode(runMode: RvcRunMode360): Promise<void> {
+    override async updateRvcRunMode(runMode: RvcRunMode360): Promise<void> {
         this.log.info(`${AN}RVC Run Mode${RI}: ${formatEnumLog(RvcRunMode360, runMode)}`);
         await this.updateState('rvcRunMode', { currentMode: runMode });
     }
 
     // Update the RVC Clean Mode cluster attributes when required
     @ifValueChanged
-    async updateRvcCleanMode(cleanMode: RvcCleanMode360): Promise<void> {
+    override async updateRvcCleanMode(cleanMode: RvcCleanMode360): Promise<void> {
         this.log.info(`${AN}RVC Clean Mode${RI}: ${formatEnumLog(RvcCleanMode360, cleanMode)}`);
         await this.updateState('rvcCleanMode', { currentMode: cleanMode });
     }
 
     // Update the RVC Operational State cluster attributes when required
     @ifValueChanged
-    async updateRvcOperationalState(attributes: UpdateRvcOperationalState360): Promise<void> {
+    override async updateRvcOperationalState(attributes: UpdateRvcOperationalState360): Promise<void> {
         const { operationalState, operationalError, isActive } = attributes;
         this.log.info(`${AN}RVC Operational State${RI}: ${formatEnumLog(RvcOperationalState.OperationalState, operationalState)}`);
         await this.updateState('rvcOperationalState', { operationalState, operationalError });
@@ -404,7 +326,7 @@ export class MatterAccessory360 {
 
     // Update the Service Area cluster attributes when required
     @ifValueChanged
-    async updateServiceArea(attributes: UpdateServiceArea360): Promise<void> {
+    override async updateServiceArea(attributes: UpdateServiceArea360): Promise<void> {
         if (!this.options.supportsMaps) return;
         const { currentArea, progress, selectedAreas, supportedAreas, supportedMaps } = attributes;
         const areaName = (areaId: number | null): string => formatAreaName(supportedMaps, supportedAreas, areaId);
@@ -528,12 +450,6 @@ export class MatterAccessory360 {
         }
         return new status.Failure(message);
     }
-}
-
-// Format an enumerated value for logging
-export function formatEnumLog(enumType: Record<number, string>, value: number): string {
-    const label = enumType[value];
-    return `${AV}${label ?? 'Unknown'}${RI} (${AV}${value}${RI})`;
 }
 
 // Format a Service Area area identifier for logging
