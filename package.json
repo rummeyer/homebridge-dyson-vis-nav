@@ -92,6 +92,7 @@
         "mqtt-logs/",
         "config.schema.json",
         "README.md",
+        "CHANGELOG.md",
         "LICENSE"
     ]
 }
