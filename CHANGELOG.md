@@ -11,6 +11,18 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+### Changed
+
+- **Documented every `config.json` setting** in the README. The reference there
+  listed only a handful of keys and explained just one of them; it now gives the
+  type, default and meaning of each, including the values `logMapStyle` and
+  `debugFeatures` accept, the range `unreachableTimeout` is held to, and the
+  `dysonAccount` fields — among them `token`, which the settings schema has
+  always accepted without saying so anywhere.
+- **The settings page points at the right file** for mock devices. Its footer
+  sent you to the README, where they have never been described; they are in
+  `CONTRIBUTING.md`, which the footer now links to directly.
+
 ## [1.0.2] — 2026-09-21
 
 ### Added

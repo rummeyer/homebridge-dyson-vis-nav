@@ -5,7 +5,7 @@
     "customUi": true,
     "customUiPath": "./homebridge-ui",
     "headerDisplay": "Exposes the Dyson 360 Vis Nav robot vacuum to Apple Home.\n\nWith **Matter enabled** in the Homebridge settings it appears as a native robot vacuum cleaner. Without Matter it appears as a switch that starts a clean and sends the robot back to its dock, plus its battery and a problem sensor — HomeKit has no robot vacuum of its own.",
-    "footerDisplay": "Mock devices for development are set directly in config.json; see the README.",
+    "footerDisplay": "Mock devices for development are set directly in config.json; see [CONTRIBUTING.md](https://github.com/rummeyer/homebridge-dyson-vis-nav/blob/main/CONTRIBUTING.md).",
     "schema": {
         "type": "object",
         "required": [

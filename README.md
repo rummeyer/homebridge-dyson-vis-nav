@@ -172,6 +172,11 @@ Everything below has a sensible default; you can ignore all of it.
 <details>
 <summary>Editing <code>config.json</code> directly</summary>
 
+The settings page writes this block for you; you only need it if you edit
+`config.json` by hand. `platform` must read exactly as shown — it is what ties
+the block to this plugin — and `dysonAccount` has to be there for the default
+`"Remote Account"` method. Every key that has a default below may be left out.
+
 ```json
 {
     "platform": "DysonVisNav",
@@ -183,17 +188,45 @@ Everything below has a sensible default; you can ignore all of it.
         "country": "GB"
     },
     "whiteList": [],
+    "simpleModeTagsRvc": true,
+    "wildcardTopic": false,
+    "logMapStyle": "Off",
     "unreachableTimeout": 120,
-    "debug": false
+    "debug": false,
+    "debugFeatures": []
 }
 ```
 
-Set `"country"` to the two-letter code for the country your MyDyson account
-belongs to. It selects the Dyson server — mainland China has its own — and the
-language that per-device requests ask for.
+| Key | Type | Default | What it does |
+|---|---|---|---|
+| `platform` | string | — | Must be `"DysonVisNav"`. The only required key |
+| `name` | string | `"Dyson 360 Vis Nav"` | Name shown in the Homebridge log |
+| `provisioningMethod` | string | `"Remote Account"` | `"Remote Account"` uses your MyDyson account. `"Mock Devices"` replays a recorded MQTT session instead, for development — see [CONTRIBUTING.md](https://github.com/rummeyer/homebridge-dyson-vis-nav/blob/main/CONTRIBUTING.md) |
+| `dysonAccount` | object | — | The MyDyson account to read devices from; see below |
+| `whiteList` | string[] | `[]` | Serial numbers to expose. Empty exposes every robot vacuum in the account |
+| `simpleModeTagsRvc` | boolean | `true` | Advertise one Matter clean-mode tag per cleaning mode instead of the full set. Turn off only if your controller needs all of them |
+| `wildcardTopic` | boolean | `false` | Subscribe to every MQTT topic the robot publishes. Useful when capturing a log for a bug report |
+| `logMapStyle` | string | `"Off"` | Draw a map of each finished clean into the log: `"Off"`, `"Monospaced"` for a terminal, or `"Homebridge"` for the log viewer |
+| `unreachableTimeout` | integer | `120` | Seconds the robot may stay silent before Apple Home is told its activity is unknown. Between 10 and 3600 |
+| `debug` | boolean | `false` | Much more detail in the log |
+| `debugFeatures` | string[] | `[]` | Individual extras, any of `"Log API Headers"`, `"Log API Bodies"`, `"Log MQTT Client"`, `"Log MQTT Payloads"`, `"Log MQTT Payloads as JSON"`, `"Log Serial Numbers"`, `"Log Debug as Info"` |
 
-Configurations from before this field are migrated on startup: a `"china": true`
-flag becomes `"CN"`, and anything else becomes `"GB"`.
+**Inside `dysonAccount`:**
+
+| Key | Type | Default | What it does |
+|---|---|---|---|
+| `email` | string | — | The address your MyDyson account uses. It also keys the stored access token |
+| `password` | string | — | Optional. Used **only** to exchange the emailed code for a token, so it can be removed afterwards — see [What is stored, and where](#what-is-stored-and-where) |
+| `country` | string | `"GB"` | Two-letter code for the country your MyDyson account belongs to |
+| `token` | string | — | Optional. Supply an access token yourself instead of authorising through the settings page. It takes precedence over the stored one |
+
+A key the plugin does not know is ignored, with a warning in the log naming it,
+so a typo is visible rather than silently ineffective.
+
+`country` selects the Dyson server — mainland China has its own — and the
+language that per-device requests ask for. Configurations from before this field
+are migrated on startup: a `"china": true` flag becomes `"CN"`, and anything else
+becomes `"GB"`.
 </details>
 
 ---
