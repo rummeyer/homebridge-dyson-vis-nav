@@ -8,7 +8,7 @@ import { checkers } from './ti/config-types.js';
 import { CheckerT, IErrorDetail } from 'ts-interface-checker';
 import { deepMerge, getValidationTree } from './utils.js';
 import { DEFAULT_CONFIG, DEFAULT_COUNTRY, PLUGIN_NAME } from './settings.js';
-import { Config, DysonAccountLogin, ProvisioningMethod } from './config-types.js';
+import { Config, ProvisioningMethod } from './config-types.js';
 import { inspect } from 'util';
 import { INSPECT_VERBOSE } from './logger-options.js';
 
@@ -60,20 +60,6 @@ function normaliseAccountCountry(log: AnsiLogger, config: PlatformConfig): void 
     const country = china ? 'CN' : DEFAULT_COUNTRY;
     account.country = country;
     if (china) log.info(`MyDyson account country set to ${country} from the previous China setting`);
-}
-
-// Extract a validated dysonAccount from the (possibly incomplete) configuration
-export function getDysonAccount(log: AnsiLogger, config: PlatformConfig): DysonAccountLogin {
-    const account: unknown = config.dysonAccount;
-    const checker = checkers.DysonAccountLogin;
-    checker.setReportedPath('<PLATFORM_CONFIG>.dysonAccount');
-    const strictValidation = checker.strictValidate(account);
-    if (!checker.test(account)) {
-        log.error('Dyson account configuration errors:');
-        logCheckerValidation(log, config, LogLevel.ERROR, strictValidation);
-        throw new Error('Invalid Dyson account configuration');
-    }
-    return account;
 }
 
 // Log configuration checker validation errors

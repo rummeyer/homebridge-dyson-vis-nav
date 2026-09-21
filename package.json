@@ -53,8 +53,7 @@
         "pngjs": "^7.0.0",
         "semver": "^7.8.5",
         "ts-interface-checker": "^1.0.2",
-        "undici": "^8.10.2",
-        "ws": "^8.21.3"
+        "undici": "^8.10.2"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
@@ -78,7 +77,6 @@
         "clean": "rimraf ./src/ti ./dist",
         "prepare": "npm run build",
         "lint": "eslint 'bin/**/*.ts' 'src/**/*.ts' --max-warnings=0",
-        "watch": "npm run build && npm link && nodemon",
         "prepublishOnly": "npm run build && npm run lint",
         "check-layout": "tsx bin/check-plugin-layout.ts",
         "check-ui-server": "node bin/check-ui-server.mjs",
@@ -89,7 +87,6 @@
     "files": [
         "dist/",
         "homebridge-ui/",
-        "mqtt-logs/",
         "config.schema.json",
         "README.md",
         "CHANGELOG.md",

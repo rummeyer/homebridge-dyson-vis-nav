@@ -11,6 +11,23 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+### Removed
+
+- **A development fixture from the published package.** `mqtt-logs/` is a
+  recorded MQTT session used by the test that replays it, and that test is in
+  `bin/`, which was never published — so every installation carried 143 kB it
+  had no way to use. The package is now 18% smaller. Replaying the session from
+  a clone is unaffected.
+- **`ws` as a direct dependency.** Nothing in this plugin imports it; the MQTT
+  connection is made by `mqtt`, which declares its own copy and still resolves
+  the same version. One fewer top-level package on install.
+- **An unused `getDysonAccount()`**, dead since the original port — upstream
+  calls it from the platform, this plugin authorises through the settings UI
+  instead and never did.
+- **The `watch` script**, which invoked a `nodemon` that was in no dependency
+  list and had no configuration, so it could not run on a fresh clone. The
+  development loop documented in `CONTRIBUTING.md` is unaffected.
+
 ## [1.0.3] — 2026-09-21
 
 ### Changed
