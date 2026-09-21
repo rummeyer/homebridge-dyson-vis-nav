@@ -269,7 +269,8 @@ Collected the hard way. All are now asserted by `check-plugin-layout`.
 Homebridge's verified-plugin requirements include a GitHub release with notes for
 each version, so this is not optional housekeeping.
 
-1. Bump `version` in `package.json`
+1. Bump `version` in `package.json`, and the two `version` fields in
+   `package-lock.json` to match
 2. `npm run build && npm run lint`
 3. Commit, `git tag -a vX.Y.Z`, push both
 4. `npm pack`, then `gh release create vX.Y.Z <tarball> --title … --notes …`
