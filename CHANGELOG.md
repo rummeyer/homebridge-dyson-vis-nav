@@ -5,11 +5,18 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-Everything before 1.0.1 was written after the fact, reconstructed from the
-commits each release contained. Entries describe what changed for someone using
+Everything up to and including 1.0.1 was written after the fact, reconstructed
+from the commits each release contained. Entries describe what changed for someone using
 the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
+
+## [1.0.2] — 2026-09-21
+
+### Added
+
+- **This changelog**, reconstructed from the commits behind the twenty-one
+  releases that came before it, and shipped in the npm package.
 
 ## [1.0.1] — 2026-09-21
 
@@ -236,7 +243,8 @@ Verified end to end by replaying a recorded Vis Nav MQTT session: the accessory
 publishes as a standalone Matter node and all five clusters track the device
 through cleaning, docking, charging and fault states.
 
-[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v0.4.2...v1.0.0
 [0.4.2]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v0.4.1...v0.4.2
