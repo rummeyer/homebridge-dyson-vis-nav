@@ -30,6 +30,16 @@
         "url": "https://github.com/rummeyer/homebridge-dyson-vis-nav/issues"
     },
     "homepage": "https://github.com/rummeyer/homebridge-dyson-vis-nav#readme",
+    "funding": [
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/rummeyer"
+        },
+        {
+            "type": "paypal",
+            "url": "https://paypal.me/rummeyer"
+        }
+    ],
     "type": "module",
     "main": "dist/index.js",
     "engines": {
