@@ -71,11 +71,13 @@
         "files": [
             "dyson-air-*.ts",
             "dyson-device-air*.ts",
+            "dyson-mqtt-air.ts",
             "endpoint-*.ts",
             "platform.ts",
             "index.ts",
             "settings.ts",
             "config-types.ts",
+            "dyson-mqtt-config.ts",
             "config-check.ts",
             "check-versions.ts",
             "logger-filter.ts",
