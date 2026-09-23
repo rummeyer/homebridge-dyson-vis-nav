@@ -11,6 +11,8 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+## [1.0.5] — 2026-09-23
+
 ### Added
 
 - **A Buy Me a Coffee funding link** (buymeacoffee.com/rummeyer), next to
@@ -282,7 +284,8 @@ Verified end to end by replaying a recorded Vis Nav MQTT session: the accessory
 publishes as a standalone Matter node and all five clusters track the device
 through cleaning, docking, charging and fault states.
 
-[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.4...HEAD
+[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.5...HEAD
+[1.0.5]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.1...v1.0.2
