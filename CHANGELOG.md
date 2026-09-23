@@ -11,6 +11,12 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+### Added
+
+- **A Buy Me a Coffee funding link** (buymeacoffee.com/rummeyer), next to
+  GitHub Sponsors and PayPal in `package.json` and `.github/FUNDING.yml`. No
+  behaviour changes.
+
 ## [1.0.4] — 2026-09-21
 
 ### Removed
