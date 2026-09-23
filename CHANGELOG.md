@@ -11,6 +11,14 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+## [1.0.6] — 2026-09-23
+
+### Changed
+
+- **The README shows the npm download count and a Buy Me a Coffee badge**,
+  instead of three donate badges. GitHub Sponsors, PayPal and Buy Me a Coffee
+  all stay in `package.json` and `.github/FUNDING.yml`. No behaviour changes.
+
 ## [1.0.5] — 2026-09-23
 
 ### Added
@@ -284,7 +292,8 @@ Verified end to end by replaying a recorded Vis Nav MQTT session: the accessory
 publishes as a standalone Matter node and all five clusters track the device
 through cleaning, docking, charging and fault states.
 
-[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.5...HEAD
+[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.6...HEAD
+[1.0.6]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.2...v1.0.3
