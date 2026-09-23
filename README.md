@@ -10,14 +10,13 @@
 
 <p align="center">
   <a href="https://github.com/rummeyer/homebridge-dyson-vis-nav/releases"><img src="https://img.shields.io/github/v/release/rummeyer/homebridge-dyson-vis-nav?label=release" alt="Release"></a>
+  <a href="https://www.npmjs.com/package/homebridge-dyson-vis-nav"><img src="https://img.shields.io/npm/dt/homebridge-dyson-vis-nav" alt="Downloads"></a>
   <a href="https://github.com/rummeyer/homebridge-dyson-vis-nav/blob/main/LICENSE"><img src="https://img.shields.io/badge/licence-ISC-blue" alt="Licence"></a>
   <img src="https://img.shields.io/badge/homebridge-%E2%89%A5%202.4.0-purple" alt="Homebridge 2.4.0+">
   <img src="https://img.shields.io/badge/node-22%20%7C%2024%20%7C%2026-green" alt="Node 22, 24 or 26">
 </p>
 
 <p align="center">
-  <a href="https://github.com/sponsors/rummeyer"><img src="https://img.shields.io/badge/donate-GitHub%20Sponsors-yellow" alt="Donate with GitHub Sponsors"></a>
-  <a href="https://paypal.me/rummeyer"><img src="https://img.shields.io/badge/donate-PayPal-yellow" alt="Donate with PayPal"></a>
   <a href="https://buymeacoffee.com/rummeyer"><img src="https://img.shields.io/badge/donate-Buy%20Me%20a%20Coffee-yellow" alt="Buy Me a Coffee"></a>
 </p>
 
