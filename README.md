@@ -168,22 +168,29 @@ Open the plugin's settings in Homebridge and switch to the **Recent Cleans** tab
 - how often the robot had to recharge, if it did
 - the rooms it cleaned — rooms it only drove through on the way are left out
 
-Select a clean to see its map, drawn at full resolution — one pixel for every 2 cm of floor:
+Select a clean to see its map, drawn at full resolution — one pixel for every 2 cm of floor — with the rooms you set up in the MyDyson app, each in its own colour and with its name:
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/rummeyer/homebridge-dyson-vis-nav/main/assets/clean-map.png" width="576" alt="Map of a clean covering a hallway and a living room, coloured by how much dust the robot picked up">
+  <img src="https://raw.githubusercontent.com/rummeyer/homebridge-dyson-vis-nav/main/assets/clean-map.png" width="576" alt="Floor plan of a flat with eight named rooms; the hallway and living room are coloured by how much dust the robot picked up">
 </p>
 
 | On the map | Means |
 |---|---|
 | purple → red → orange → yellow → white | cleaned floor, coloured by how much dust the robot picked up there; the brighter, the dirtier |
-| dark grey | a room on your map that this clean did not cover |
-| thin white lines | room boundaries |
+| dark, tinted | a room that this clean did not cover, one tint per room |
+| white lines | walls |
 | blue dot | the dock |
 | yellow dot | where the robot reported a fault |
 | black | outside your map |
 
 The map is drawn from the cloud data stored with each clean when you open it, so every stored clean has one.
+
+**Floor plan or as mapped.** The switch above the map picks how the rooms are drawn, and your browser remembers the choice:
+
+- **Floor plan** (the default) tidies the rooms into a plan. The robot maps a room only as far as it can drive, so furniture leaves it ragged: a bed is a hole, a wardrobe along a wall takes 60 cm off the room. Each room is squared off into a rectangle, or a few rectangles for an L- or T-shaped hallway. Walls then line up: rooms meet without gaps, and rooms along the same outside wall end at the same line. A room that stops short of its neighbour, say where a bath stands, is extended to meet it.
+- **As mapped** shows the rooms exactly as the robot recorded them, with every piece of furniture outlined in white and grey lines where one room meets the next.
+
+The floor plan assumes straight walls at right angles. Sloping walls and bay windows come out as rectangles. If a room looks wrong, check it under **As mapped**: a room that runs into its neighbour there was mapped that way, and is fixed by editing the room in the MyDyson app.
 
 **Where the maps come from.** When the robot finishes a clean, the plugin asks Dyson's cloud for the clean's map — the same data the MyDyson app shows — and stores it locally, keeping the last five. Dyson's cloud keeps about as many, but the stored copy means the list keeps working when the cloud does not answer or the authorisation has lapsed.
 
