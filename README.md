@@ -170,6 +170,10 @@ Open the plugin's settings in Homebridge and switch to the **Recent Cleans** tab
 
 Select a clean to see its map, drawn at full resolution — one pixel for every 2 cm of floor:
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/rummeyer/homebridge-dyson-vis-nav/main/assets/clean-map.png" width="576" alt="Map of a clean covering a hallway and a living room, coloured by how much dust the robot picked up">
+</p>
+
 | On the map | Means |
 |---|---|
 | purple → red → orange → yellow → white | cleaned floor, coloured by how much dust the robot picked up there; the brighter, the dirtier |
