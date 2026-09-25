@@ -21,7 +21,10 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 - **Clean maps are drawn as a floor plan.** Furniture left the mapped rooms
   ragged; each room is now squared off into a rectangle, or a few rectangles
-  for an L- or T-shaped hallway, with the dust shown inside it.
+  for an L- or T-shaped hallway, with the dust shown inside it. Walls line
+  up: rooms meet without gaps, and rooms along one wall of the house end at
+  the same line. A switch above the map shows the rooms as mapped instead,
+  and the choice is remembered in the browser.
 
 ## [1.3.1] — 2026-09-25
 

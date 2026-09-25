@@ -271,6 +271,7 @@ const IMAGE_COLOURS = {
     outside:    [  0,   0,   0],
     zone:       [ 42,  42,  46],
     boundary:   [205, 205, 210],
+    divider:    [140, 140, 150],
     dock:       [ 95,  95, 215],
     fault:      [255, 215,   0],
     marker:     [255, 255, 255]
@@ -301,11 +302,12 @@ export interface Dyson360MapImage {
 // levels blended smoothly instead of in steps, and the rooms told apart. The
 // names are returned rather than drawn so that the page can set them as text.
 export function dysonRenderImage360VisNav(
-    log:    AnsiLogger,
-    clean:  Dyson360CleanMap,
-    map?:   Dyson360PersistentMapResponse
+    log:        AnsiLogger,
+    clean:      Dyson360CleanMap,
+    map?:       Dyson360PersistentMapResponse,
+    floorPlan = true
 ): Dyson360MapImage {
-    const { renderer, dustScale } = prepareMap360VisNav(log, clean, map);
+    const { renderer, mmPerPixel, dustScale } = prepareMap360VisNav(log, clean, map);
     renderer.charAspectRatio = 1;
     const { width, height, readPixels } = renderer.prepareBitmaps(1);
 
@@ -313,10 +315,14 @@ export function dysonRenderImage360VisNav(
     const pixels = Array.from({ length: width * height }, (_, i) => readPixels(i % width, Math.floor(i / width)) as
         [Dyson360VisNavCleanedOctet, Dyson360VisNavPresentationOctet, number, number]);
 
-    // Draw the rooms as a floor plan: furniture leaves the mapped rooms ragged,
-    // so each is squared off into a rectangle, or a few for an L or T shape
+    // The rooms either as mapped, or as a floor plan: furniture leaves the
+    // mapped rooms ragged, so each is squared off into a rectangle (or a few
+    // for an L or T shape) and the walls lined up
     const zones = map?.zonesDefinition.zones ?? [];
-    const rooms = straightenRooms(width, height, i => pixels[i]?.[3] ?? 0);
+    const mapped = (i: number): number => pixels[i]?.[3] ?? 0;
+    const rooms = floorPlan
+        ? straightenRooms(width, height, mapped, Math.round(ROOM_SNAP_MM / mmPerPixel), Math.round(ROOM_GAP_MM / mmPerPixel))
+        : Uint8Array.from({ length: width * height }, (_, i) => mapped(i));
     const roomAt = (x: number, y: number): number =>
         (0 <= x && x < width && 0 <= y && y < height) ? rooms[y * width + x] ?? 0 : 0;
     const roomColour = (room: number): Rgb => {
@@ -324,17 +330,21 @@ export function dysonRenderImage360VisNav(
         return index < 0 ? IMAGE_COLOURS.zone : ROOM_COLOURS[index % ROOM_COLOURS.length] ?? IMAGE_COLOURS.zone;
     };
 
-    // A pixel is on a wall if a neighbouring pixel lies in another room or
-    // outside (both sides of a shared wall are marked, so it is two pixels wide)
-    const onWall = (x: number, y: number): boolean => {
+    // Whether a neighbouring pixel lies in another room, or (for the floor
+    // plan's walls) outside; both sides are marked, so lines are two pixels wide
+    const bordersRoom = (x: number, y: number, orOutside: boolean): boolean => {
         const room = roomAt(x, y);
         if (!room) return false;
-        return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx = 0, dy = 0]) => roomAt(x + dx, y + dy) !== room);
+        return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx = 0, dy = 0]) => {
+            const other = roomAt(x + dx, y + dy);
+            return other !== room && (orOutside || other !== 0);
+        });
     };
 
-    // Colour each pixel, remembering where the markers go; without any rooms
-    // (a clean with no map) the walls are those of the presentation map
-    const hasRooms = rooms.some(room => room !== 0);
+    // Colour each pixel, remembering where the markers go. The floor plan
+    // draws its own walls and keeps the dust inside its rooms; as mapped (or
+    // for a clean with no rooms) the walls are those of the presentation map.
+    const plan = floorPlan && rooms.some(room => room !== 0);
     const png = new PNG({ width, height });
     const docks: { x: number, y: number }[] = [];
     const faults: { x: number, y: number }[] = [];
@@ -348,19 +358,22 @@ export function dysonRenderImage360VisNav(
             const pixel = pixels[y * width + x];
             assertIsDefined(pixel);
             const [cleaned, presentation, dust] = pixel;
+            const room = roomAt(x, y);
             if (cleaned === Dyson360VisNavCleanedOctet.Fault) faults.push({ x, y });
             if (presentation === Dyson360VisNavPresentationOctet.Dock) docks.push({ x, y });
             let colour: Rgb;
-            if (hasRooms ? onWall(x, y) : presentation === Dyson360VisNavPresentationOctet.Boundary) {
+            if (plan ? bordersRoom(x, y, true) : presentation === Dyson360VisNavPresentationOctet.Boundary) {
                 colour = IMAGE_COLOURS.boundary;
-            } else if (hasRooms && !roomAt(x, y)) {
+            } else if (plan ? !room : false) {
                 colour = IMAGE_COLOURS.outside;
+            } else if (!plan && bordersRoom(x, y, false)) {
+                colour = IMAGE_COLOURS.divider;
             } else if (cleaned !== Dyson360VisNavCleanedOctet.Empty) {
                 colour = dustColour(dust / dustScale);
-            } else if (hasRooms) {
-                colour = roomColour(roomAt(x, y));
+            } else if (!plan && presentation === Dyson360VisNavPresentationOctet.Empty) {
+                colour = IMAGE_COLOURS.outside;
             } else {
-                colour = presentation === Dyson360VisNavPresentationOctet.Empty ? IMAGE_COLOURS.outside : IMAGE_COLOURS.zone;
+                colour = roomColour(room);
             }
             put(x, y, colour);
         }
@@ -403,13 +416,25 @@ const ROOM_FILL = 0.5;
 // this is cut off
 const ROOM_EDGE = 0.25;
 
+// Room edges this close are taken to be the same wall: besides the thickness
+// of an internal wall, a wardrobe or sideboard along a wall (typically 60 cm
+// deep) keeps the mapped room short of it
+const ROOM_SNAP_MM = 1000;
+
+// A room this close to a wider one facing it, with nothing between them, is
+// extended to meet it: something the robot cannot enter (a bath, a kitchen
+// unit) filled the gap
+const ROOM_GAP_MM = 2000;
+
 // Square off each room of a zone grid (room id per pixel, 0 for none) into a
 // rectangle, or split it where that leaves the least empty space and square off
 // the parts; larger rooms are drawn first so that smaller ones stay visible
 function straightenRooms(
     width:  number,
     height: number,
-    zoneOf: (index: number) => number
+    zoneOf: (index: number) => number,
+    snap:   number,     // (pixels)
+    gap:    number      // (pixels)
 ): Uint8Array {
     const minSize = 10;     // (pixels, so 20 cm at the usual resolution)
     const counts = new Map<number, number>();
@@ -418,7 +443,7 @@ function straightenRooms(
         if (zone) counts.set(zone, (counts.get(zone) ?? 0) + 1);
     }
 
-    const rooms = new Uint8Array(width * height);
+    const rects: RoomRect[] = [];
     for (const zone of [...counts.keys()].sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0))) {
         // Summed-area table of this room's pixels, for counting any rectangle
         const sums = new Int32Array((width + 1) * (height + 1));
@@ -429,7 +454,6 @@ function straightenRooms(
                         + (sums[i - 1] ?? 0) + (sums[i - width - 1] ?? 0) - (sums[i - width - 2] ?? 0);
             }
         }
-        interface Box { x0: number, y0: number, x1: number, y1: number }  // (exclusive x1, y1)
         const count = ({ x0, y0, x1, y1 }: Box): number =>
             (sums[y1 * (width + 1) + x1] ?? 0) - (sums[y0 * (width + 1) + x1] ?? 0)
           - (sums[y1 * (width + 1) + x0] ?? 0) + (sums[y0 * (width + 1) + x0] ?? 0);
@@ -486,11 +510,103 @@ function straightenRooms(
             return best.parts.flatMap(part => split(part, depth + 1));
         };
 
-        for (const { x0, y0, x1, y1 } of split({ x0: 0, y0: 0, x1: width, y1: height }, 0)) {
-            for (let y = y0; y < y1; ++y) rooms.fill(zone, y * width + x0, y * width + x1);
+        for (const box of split({ x0: 0, y0: 0, x1: width, y1: height }, 0)) rects.push({ zone, ...box });
+    }
+
+    // Line up the walls, then paint the rooms (largest first)
+    snapRoomEdges(rects, snap);
+    closeRoomGaps(rects, gap);
+    const rooms = new Uint8Array(width * height);
+    for (const { zone, x0, y0, x1, y1 } of rects) {
+        for (let y = Math.max(0, y0); y < Math.min(height, y1); ++y) {
+            rooms.fill(zone, y * width + Math.max(0, x0), y * width + Math.min(width, x1));
         }
     }
     return rooms;
+}
+
+// A rectangle of a room, in pixels (exclusive x1, y1)
+interface Box { x0: number, y0: number, x1: number, y1: number }
+interface RoomRect extends Box { zone: number }
+
+// Walls are shared: rooms have no gaps between them, and the rooms along one
+// wall of the house end at the same line. Mapping leaves neither true, so move
+// the edges of rectangles that lie within the snap distance of each other, and
+// alongside each other, onto a common line. Edges facing the same way (the
+// outside of the house) move out to the furthest of them; edges facing each
+// other (the two sides of an internal wall) meet between them.
+function snapRoomEdges(rects: RoomRect[], snap: number): void {
+    for (const axis of ['x', 'y'] as const) {
+        const [lo, hi, crossLo, crossHi] = axis === 'x'
+            ? ['x0', 'x1', 'y0', 'y1'] as const : ['y0', 'y1', 'x0', 'x1'] as const;
+        interface Edge { rect: RoomRect, side: typeof lo | typeof hi, at: number }
+        const edges: Edge[] = rects.flatMap(rect => [
+            { rect, side: lo, at: rect[lo] }, { rect, side: hi, at: rect[hi] }
+        ]);
+
+        // Group edges that are alongside each other, closest first, as long as
+        // a group spans no more than the snap distance (so that no chain of
+        // near neighbours drags distant walls together) and holds only one
+        // edge of any rectangle (so that no room collapses)
+        const groupOf = edges.map(edge => [edge]);
+        const pairs: [Edge, Edge][] = [];
+        edges.forEach((a, i) => {
+            edges.slice(i + 1).forEach(b => {
+                const gap = Math.max(a.rect[crossLo], b.rect[crossLo]) - Math.min(a.rect[crossHi], b.rect[crossHi]);
+                if (Math.abs(a.at - b.at) <= snap && gap <= snap) pairs.push([a, b]);
+            });
+        });
+        pairs.sort(([a, b], [c, d]) => Math.abs(a.at - b.at) - Math.abs(c.at - d.at));
+        for (const [a, b] of pairs) {
+            const groupA = groupOf[edges.indexOf(a)], groupB = groupOf[edges.indexOf(b)];
+            if (!groupA || !groupB || groupA === groupB) continue;
+            const merged = [...groupA, ...groupB];
+            const ats = merged.map(({ at }) => at);
+            if (snap < Math.max(...ats) - Math.min(...ats)) continue;
+            if (new Set(merged.map(({ rect }) => rect)).size < merged.length) continue;
+            for (const edge of merged) groupOf[edges.indexOf(edge)] = merged;
+        }
+
+        // Move each group of edges onto one line
+        for (const members of new Set(groupOf)) {
+            if (members.length < 2) continue;
+            const los = members.filter(({ side }) => side === lo).map(({ at }) => at);
+            const his = members.filter(({ side }) => side === hi).map(({ at }) => at);
+            const mean = (values: number[]): number => values.reduce((a, b) => a + b, 0) / values.length;
+            const line = !his.length ? Math.min(...los)
+                       : !los.length ? Math.max(...his)
+                       : Math.round((mean(los) + mean(his)) / 2);
+            for (const { rect, side } of members) {
+                // (never collapse a rectangle whose own two edges are this close)
+                const moved = { ...rect, [side]: line };
+                if (moved[lo] < moved[hi]) rect[side] = line;
+            }
+        }
+    }
+}
+
+// Extend a room across a gap to the room it faces, when the other room spans
+// at least its whole width (so the extension cannot overlap a third room) and
+// no other room lies in the gap
+function closeRoomGaps(rects: RoomRect[], maxGap: number): void {
+    const overlaps = (a: Box, b: Box): boolean => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+    for (const axis of ['x', 'y'] as const) {
+        const [lo, hi, crossLo, crossHi] = axis === 'x'
+            ? ['x0', 'x1', 'y0', 'y1'] as const : ['y0', 'y1', 'x0', 'x1'] as const;
+        for (const a of rects) {
+            for (const b of rects) {
+                // (a before b along this axis)
+                const gap = b[lo] - a[hi];
+                if (a.zone === b.zone || gap <= 0 || maxGap < gap) continue;
+                if (a[crossHi] <= b[crossLo] || b[crossHi] <= a[crossLo]) continue;
+                const [narrow, wide] = a[crossHi] - a[crossLo] <= b[crossHi] - b[crossLo] ? [a, b] : [b, a];
+                if (narrow[crossLo] < wide[crossLo] || wide[crossHi] < narrow[crossHi]) continue;
+                const between: Box = { ...narrow, [lo]: a[hi], [hi]: b[lo] };
+                if (rects.some(other => other !== a && other !== b && overlaps(other, between))) continue;
+                if (narrow === a) a[hi] = b[lo]; else b[lo] = a[hi];
+            }
+        }
+    }
 }
 
 // For each room, the pixel furthest from its edge (a two-pass chamfer distance)

@@ -29,6 +29,7 @@
                     font-size: .7rem; font-weight: 600; line-height: 1; white-space: nowrap; color: #fff;
                     text-shadow: 0 0 2px #000, 0 0 3px #000, 0 0 4px #000; }
     .dy-legend    { margin: .5rem 0 0; font-size: .75rem; color: #bbb; text-align: center; }
+    .dy-views     { display: flex; justify-content: flex-end; margin-bottom: .75rem; }
 </style>
 
 <ul class="nav nav-tabs dy-tabs" role="tablist">
@@ -93,11 +94,20 @@
         appears here shortly after it finishes. This needs the MyDyson account, because the
         map comes from Dyson's cloud.</div>
     <div id="dyCleanMap" class="dy-map dy-hidden">
+        <div class="dy-views">
+            <div class="btn-group btn-group-sm" role="group" aria-label="Map style">
+                <button type="button" class="btn btn-outline-light" id="dyViewPlan">Floor plan</button>
+                <button type="button" class="btn btn-outline-light" id="dyViewMapped">As mapped</button>
+            </div>
+        </div>
         <div class="dy-map-frame" id="dyCleanFrame">
             <img id="dyCleanImage" alt="Map of the selected clean">
         </div>
-        <div class="dy-legend">Brighter = more dust &middot; blue dot = dock
+        <div class="dy-legend" id="dyLegendPlan">Brighter = more dust &middot; blue dot = dock
             &middot; yellow dot = fault &middot; rooms squared off, without the furniture</div>
+        <div class="dy-legend" id="dyLegendMapped">Brighter = more dust &middot; blue dot = dock
+            &middot; yellow dot = fault &middot; white lines = walls and furniture
+            &middot; grey lines = room dividers</div>
     </div>
     <button type="button" class="btn btn-sm btn-danger mt-3" id="dyCleanReset">Reset data</button>
 </div>
@@ -277,13 +287,31 @@
         return { title, facts: facts.join(' \u00B7 '), zones: (clean.zones ?? []).join(', ') };
     };
 
+    // Map style: rooms squared off into a floor plan, or as the robot mapped
+    // them; remembered in this browser only (storage may be unavailable)
+    const STYLE_KEY = 'dyson-vis-nav-map-style';
+    let floorPlan = true;
+    try { floorPlan = localStorage.getItem(STYLE_KEY) !== 'mapped'; } catch { /* default */ }
+    const showStyle = () => {
+        for (const [id, active] of [['dyViewPlan', floorPlan], ['dyViewMapped', !floorPlan]]) {
+            $(id).classList.toggle('active', active);
+            $(id).setAttribute('aria-pressed', String(active));
+        }
+        $('dyLegendPlan').classList.toggle('dy-hidden', !floorPlan);
+        $('dyLegendMapped').classList.toggle('dy-hidden', floorPlan);
+    };
+    showStyle();
+
     // Show the map of the selected clean
     let selecting = 0;
+    let shown;
     const select = async (clean, button) => {
         for (const b of $('dyCleanList').children) b.classList.toggle('active', b === button);
+        shown = clean;
         const current = ++selecting;
         try {
-            const { png, rooms } = await homebridge.request('/clean-image', { serialNumber: clean.serialNumber, id: clean.id });
+            const { png, rooms } = await homebridge.request('/clean-image',
+                { serialNumber: clean.serialNumber, id: clean.id, floorPlan });
             if (current !== selecting) return;      // another clean was selected meanwhile
             $('dyCleanImage').src = `data:image/png;base64,${png}`;
 
@@ -304,6 +332,18 @@
             homebridge.toast.error(err.message, 'Recent Cleans');
         }
     };
+
+    // Switch the map style, redrawing the clean on show
+    const setStyle = plan => {
+        if (plan === floorPlan) return;
+        floorPlan = plan;
+        try { localStorage.setItem(STYLE_KEY, plan ? 'plan' : 'mapped'); } catch { /* not remembered */ }
+        showStyle();
+        const active = [...$('dyCleanList').children].find(b => b.classList.contains('active'));
+        if (shown) void select(shown, active);
+    };
+    $('dyViewPlan').addEventListener('click', () => setStyle(true));
+    $('dyViewMapped').addEventListener('click', () => setStyle(false));
 
     // Load the list of stored cleans
     const load = async () => {
