@@ -14,9 +14,14 @@ the plugin; the reasoning behind each one is in the commit it came from.
 ### Added
 
 - **Clean maps show the rooms.** Each room on the Recent Cleans tab has its
-  own tint and its name, with grey lines where one room meets the next, taken
-  from the rooms defined in the MyDyson app. Cleans already stored show them
-  too.
+  own tint and its name, taken from the rooms defined in the MyDyson app.
+  Cleans already stored show them too.
+
+### Changed
+
+- **Clean maps are drawn as a floor plan.** Furniture left the mapped rooms
+  ragged; each room is now squared off into a rectangle, or a few rectangles
+  for an L- or T-shaped hallway, with the dust shown inside it.
 
 ## [1.3.1] — 2026-09-25
 
