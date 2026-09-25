@@ -11,6 +11,8 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-09-25
+
 ### Added
 
 - **Clean maps show the rooms.** Each room on the Recent Cleans tab has its
@@ -25,6 +27,8 @@ the plugin; the reasoning behind each one is in the commit it came from.
   up: rooms meet without gaps, and rooms along one wall of the house end at
   the same line. A switch above the map shows the rooms as mapped instead,
   and the choice is remembered in the browser.
+- **The README's sample map shows the floor plan**, with its room names, and
+  explains the switch between the floor plan and the rooms as mapped.
 
 ## [1.3.1] — 2026-09-25
 
@@ -382,7 +386,8 @@ Verified end to end by replaying a recorded Vis Nav MQTT session: the accessory
 publishes as a standalone Matter node and all five clusters track the device
 through cleaning, docking, charging and fault states.
 
-[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.1.1...v1.2.0
