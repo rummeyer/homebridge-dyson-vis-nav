@@ -33,7 +33,7 @@ Your robot appears in the Home app as a genuine **robot vacuum cleaner**, with t
 - **What it is doing right now** — cleaning, paused, heading for the dock, charging, docked
 - **Problems, in plain language** — bin full or missing, stuck, wheels jammed, sensor obscured, and more
 - **Room cleaning**, for the rooms you have mapped in the MyDyson app
-- **Maps of your last 10 cleans** in the plugin's settings — see [Maps of recent cleans](#maps-of-recent-cleans)
+- **Maps of your last 5 cleans** in the plugin's settings — see [Maps of recent cleans](#maps-of-recent-cleans)
 - **Siri**: *"Hey Siri, start the vacuum"*, *"Hey Siri, send the vacuum to its dock"*
 
 That is what you get with Matter enabled. Without it you still get a switch, a battery and a problem sensor — see [Why Matter matters](#why-matter-matters).
@@ -119,7 +119,7 @@ You can also switch Matter on globally, under **Settings** → **Matter**, and s
 |---|---|
 | **Email address, password** | Homebridge's `config.json`, **in plain text** |
 | **Access token** | the plugin's own storage, under the Homebridge storage path |
-| **Your last 10 cleans** | `homebridge-dyson-vis-nav/cleans/` under the Homebridge storage path — each clean's map as Dyson's cloud returned it, about 400 kB per clean |
+| **Your last 5 cleans** | `homebridge-dyson-vis-nav/cleans/` under the Homebridge storage path — each clean's map as Dyson's cloud returned it, about 400 kB per clean |
 
 Credentials in `config.json` are normal for Homebridge plugins, but worth knowing: anything that can read your Homebridge configuration — including a configuration backup — can read that password.
 
@@ -161,7 +161,7 @@ The robot is **not** part of the Homebridge bridge you have already paired. Appl
 
 ### Maps of recent cleans
 
-Open the plugin's settings in Homebridge and switch to the **Recent Cleans** tab. It lists your last 10 cleans, newest first:
+Open the plugin's settings in Homebridge and switch to the **Recent Cleans** tab. It lists your last 5 cleans, newest first:
 
 - when the clean finished
 - how much floor it covered, and how long it took
@@ -181,7 +181,7 @@ Select a clean to see its map, drawn at full resolution — one pixel for every 
 
 The map is drawn from the cloud data stored with each clean when you open it, so every stored clean has one.
 
-**Where the maps come from.** When the robot finishes a clean, the plugin asks Dyson's cloud for the clean's map — the same data the MyDyson app shows — and stores it locally. Storing matters because Dyson's cloud keeps only your last few cleans (five, at the time of writing); the plugin keeps ten, and the list keeps working when the cloud does not answer.
+**Where the maps come from.** When the robot finishes a clean, the plugin asks Dyson's cloud for the clean's map — the same data the MyDyson app shows — and stores it locally, keeping the last five. Dyson's cloud keeps about as many, but the stored copy means the list keeps working when the cloud does not answer or the authorisation has lapsed.
 
 **Right after installing.** When the plugin starts and has no clean stored yet, it fetches the most recent one from the cloud once, so the list does not start empty. Earlier cleans are not fetched. A clean stored this way shows no duration, because the plugin was not watching while it ran.
 

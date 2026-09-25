@@ -6,7 +6,7 @@ import Path from 'path';
 import { PLUGIN_NAME } from './settings.js';
 
 // Number of completed cleans kept per device
-export const CLEAN_HISTORY_LIMIT = 10;
+export const CLEAN_HISTORY_LIMIT = 5;
 
 // What the settings page lists for a completed clean
 export interface CleanRecordSummary {
@@ -81,7 +81,8 @@ export async function listCleanRecords(storagePath: string): Promise<CleanRecord
     const summaries: CleanRecordSummary[] = [];
     for (const serial of serials) {
         const dir = Path.join(root, serial);
-        for (const id of await listIds(dir)) {
+        // (a list stored by an older version may be longer; the next save trims it)
+        for (const id of (await listIds(dir)).slice(0, CLEAN_HISTORY_LIMIT)) {
             const record = await readRecord(dir, id);
             if (!record) continue;
             // (records from 1.1.x also carry a text map, which nothing reads now)
