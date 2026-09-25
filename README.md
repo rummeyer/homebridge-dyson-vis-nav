@@ -175,13 +175,15 @@ Select a clean to see its map. It is drawn the way the Homebridge log shows it i
 | purple → red → orange → yellow → white | cleaned floor, coloured by how much dust the robot picked up there; the brighter, the dirtier |
 | dark grey | a room on your map that this clean did not cover |
 | white dots | room boundaries |
-| ○ | the dock |
+| ○ on blue | the dock |
 | ‼ | where the robot reported a fault |
 | faint grid | outside your map |
 
-**Where the maps come from.** When the robot finishes a clean, the plugin asks Dyson's cloud for the clean's map — the same data the MyDyson app shows — and stores it locally, so the list keeps working when the cloud does not answer. After you install or update the plugin, it fetches the most recent clean once, so the list does not start empty. The durations of cleans stored this way are unknown and left out.
+**Where the maps come from.** When the robot finishes a clean, the plugin asks Dyson's cloud for the clean's map — the same data the MyDyson app shows — and stores it locally. Storing matters because Dyson's cloud keeps only your last few cleans (five, at the time of writing); the plugin keeps ten, and the list keeps working when the cloud does not answer.
 
-**Starting over.** **Reset data** below the map deletes every stored clean. Click it twice: the first click turns it into *SURE?*, and only a second click within five seconds deletes. The list then fills again from the next clean.
+**Right after installing.** When the plugin starts and has no clean stored yet, it fetches the most recent one from the cloud once, so the list does not start empty. Earlier cleans are not fetched. A clean stored this way shows no duration, because the plugin was not watching while it ran.
+
+**Starting over.** **Reset data** below the map deletes every stored clean. Click it twice: the first click turns it into *SURE?*, and only a second click within five seconds deletes. The list then fills again from the next clean — or, if Homebridge restarts before then, from the most recent clean in the cloud, as after installing.
 
 **What it needs.** The MyDyson account from [Step 3](#step-3--connect-your-mydyson-account). Without it the plugin cannot reach the maps and the list stays empty.
 

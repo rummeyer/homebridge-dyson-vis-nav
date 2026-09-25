@@ -11,11 +11,19 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+## [1.1.1] — 2026-09-25
+
 ### Added
 
-- **Reset data on the Recent Cleans tab** deletes every stored clean. It asks
-  twice on the button itself, as *SURE?*, and the list starts again with the
-  next clean.
+- **Reset data on the Recent Cleans tab** deletes every stored clean. The
+  button is red and asks twice on itself, as *SURE?*, and the list starts
+  again with the next clean.
+
+### Changed
+
+- **The README explains what happens right after installing and after a
+  reset**, and that Dyson's cloud keeps only the last few cleans, which is why
+  the plugin stores its own ten.
 
 ## [1.1.0] — 2026-09-25
 
@@ -319,7 +327,8 @@ Verified end to end by replaying a recorded Vis Nav MQTT session: the accessory
 publishes as a standalone Matter node and all five clusters track the device
 through cleaning, docking, charging and fault states.
 
-[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.6...v1.1.0
 [1.0.6]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.4...v1.0.5
