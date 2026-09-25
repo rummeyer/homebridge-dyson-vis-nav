@@ -12,6 +12,7 @@ import {
     Dyson360PersistentMapResponse
 } from './dyson-360-cloud-types.js';
 import { inflateSync } from 'zlib';
+import { PNG } from 'pngjs';
 import { Dyson360TimelineEvent } from './dyson-360-types.js';
 import { LogMapStyle } from './config-types.js';
 import { Dyson360CleanSummary } from './dyson-device-360-base.js';
@@ -112,13 +113,13 @@ export function dysonRenderMap360Eye(
     return { charges: clean.Charges, cleanedArea: clean.Area, mapLines };
 }
 
-// Render a Dyson 360 Vis Nav cleaned area map
-export function dysonRenderMap360VisNav(
+// The overlaid bitmaps of a Dyson 360 Vis Nav clean, aligned and orientated to
+// match the app; shared by the log's text map and the settings page's image
+function prepareMap360VisNav(
     log:    AnsiLogger,
-    style:  Dyson360MapStyle,
     clean:  Dyson360CleanMap,
     map?:   Dyson360PersistentMapResponse
-): Dyson360CleanSummary {
+) {
     // Check that the bitmaps are all the same resolution
     const resolutions = new Set<number>([
         clean.cleanedFootprint.resolution,
@@ -175,16 +176,31 @@ export function dysonRenderMap360VisNav(
     const dustDataDecoded = inflateSync(Buffer.from(dustData.data, 'base64'));
     const dustDataBitmap = new DysonBitmapOctet(dustWidth, dustHeight, dustDataDecoded);
 
-    // Scale all the images to target log width and orientate to match the app
+    // Overlay the images, orientated to match the app
     const renderer = new DysonBitmapAnsi([
         { bitmap: cleanedBitmap },
         { bitmap: presentationBitmap, origin: presentationOrigin },
         { bitmap: dustDataBitmap }
     ]);
-    renderer.maxWidthChars = renderer.maxHeightChars = MAX_SIZE_CHARS;
-    renderer.charAspectRatio = ASPECT_RATIO;
     renderer.invertY = true;
     renderer.rotation = map?.zonesDefinition.persistentMapDisplayOrientation ?? 0;
+
+    // Dust level as a fraction of the maximum
+    const dustScale = dustData.scaleFactor || 255;
+    return { renderer, mmPerPixel, cleanedBitmap, dustScale };
+}
+
+// Render a Dyson 360 Vis Nav cleaned area map
+export function dysonRenderMap360VisNav(
+    log:    AnsiLogger,
+    style:  Dyson360MapStyle,
+    clean:  Dyson360CleanMap,
+    map?:   Dyson360PersistentMapResponse
+): Dyson360CleanSummary {
+    // Scale all the images to target log width
+    const { renderer, mmPerPixel, cleanedBitmap, dustScale } = prepareMap360VisNav(log, clean, map);
+    renderer.maxWidthChars = renderer.maxHeightChars = MAX_SIZE_CHARS;
+    renderer.charAspectRatio = ASPECT_RATIO;
 
     // Convert the image to text
     renderer.quadratureGlyphs = QUADRATURE_GLYPHS[style];
@@ -208,7 +224,7 @@ export function dysonRenderMap360VisNav(
             if (presentationOctet === Dyson360VisNavPresentationOctet.Dock || char === ' ') return presentationChar;
 
             // Select colour based on dust level
-            const dustLevel = Math.max(0, ...dustLevels) / (dustData.scaleFactor || 255);
+            const dustLevel = Math.max(0, ...dustLevels) / dustScale;
             const dustAnsiId = DUST_COLOURS[Math.floor(dustLevel * DUST_COLOURS.length)] ?? DUST_COLOURS.at(-1);
             assertIsDefined(dustAnsiId);
 
@@ -229,6 +245,99 @@ export function dysonRenderMap360VisNav(
 
     // Log the clean details and cleaned area map
     return { charges, cleanedArea, mapLines };
+}
+
+// Colours of the Dyson 360 Vis Nav cleaned area image (RGB)
+type Rgb = readonly [number, number, number];
+const IMAGE_COLOURS = {
+    outside:    [  0,   0,   0],
+    zone:       [ 42,  42,  46],
+    boundary:   [205, 205, 210],
+    dock:       [ 95,  95, 215],
+    fault:      [255, 215,   0],
+    marker:     [255, 255, 255]
+} as const satisfies Record<string, Rgb>;
+
+// Render a Dyson 360 Vis Nav cleaned area map as a PNG image, one pixel per
+// map pixel (typically 20 mm), coloured like the text map but with the dust
+// levels blended smoothly instead of in steps
+export function dysonRenderImage360VisNav(
+    log:    AnsiLogger,
+    clean:  Dyson360CleanMap,
+    map?:   Dyson360PersistentMapResponse
+): Buffer {
+    const { renderer, dustScale } = prepareMap360VisNav(log, clean, map);
+    renderer.charAspectRatio = 1;
+    const { width, height, readPixels } = renderer.prepareBitmaps(1);
+
+    // Colour each pixel, remembering where the markers go
+    const png = new PNG({ width, height });
+    const docks: { x: number, y: number }[] = [];
+    const faults: { x: number, y: number }[] = [];
+    const put = (x: number, y: number, [r, g, b]: Rgb): void => {
+        if (x < 0 || width <= x || y < 0 || height <= y) return;
+        const i = (y * width + x) * 4;
+        png.data[i] = r; png.data[i + 1] = g; png.data[i + 2] = b; png.data[i + 3] = 255;
+    };
+    for (let y = 0; y < height; ++y) {
+        for (let x = 0; x < width; ++x) {
+            const [cleaned, presentation, dust] = readPixels(x, y) as
+                [Dyson360VisNavCleanedOctet, Dyson360VisNavPresentationOctet, number];
+            if (cleaned === Dyson360VisNavCleanedOctet.Fault) faults.push({ x, y });
+            if (presentation === Dyson360VisNavPresentationOctet.Dock) docks.push({ x, y });
+            let colour: Rgb;
+            if (presentation === Dyson360VisNavPresentationOctet.Boundary) {
+                colour = IMAGE_COLOURS.boundary;
+            } else if (cleaned !== Dyson360VisNavCleanedOctet.Empty) {
+                colour = dustColour(dust / dustScale);
+            } else if (presentation === Dyson360VisNavPresentationOctet.Empty) {
+                colour = IMAGE_COLOURS.outside;
+            } else {
+                colour = IMAGE_COLOURS.zone;
+            }
+            put(x, y, colour);
+        }
+    }
+
+    // Draw the markers large enough to find at a glance
+    const disc = (cx: number, cy: number, radius: number, colour: Rgb): void => {
+        for (let dy = -radius; dy <= radius; ++dy) {
+            for (let dx = -radius; dx <= radius; ++dx) {
+                if (dx * dx + dy * dy <= radius * radius + radius) put(cx + dx, cy + dy, colour);
+            }
+        }
+    };
+    const markerRadius = Math.max(4, Math.round(Math.max(width, height) / 90));
+    for (const { x, y } of docks) {
+        disc(x, y, markerRadius + 2, IMAGE_COLOURS.marker);
+        disc(x, y, markerRadius,     IMAGE_COLOURS.dock);
+    }
+    for (const { x, y } of faults) {
+        disc(x, y, markerRadius + 2, IMAGE_COLOURS.outside);
+        disc(x, y, markerRadius,     IMAGE_COLOURS.fault);
+    }
+    return PNG.sync.write(png);
+}
+
+// Blend the dust level gradient smoothly (level 0 to 1)
+const DUST_RGB = DUST_COLOURS.map(xtermRgb);
+function dustColour(level: number): Rgb {
+    const position = Math.min(1, Math.max(0, level)) * (DUST_RGB.length - 1);
+    const index = Math.min(DUST_RGB.length - 2, Math.floor(position));
+    const [from, to] = [DUST_RGB[index], DUST_RGB[index + 1]];
+    assertIsDefined(from);
+    assertIsDefined(to);
+    const t = position - index;
+    const mix = (a: number, b: number): number => Math.round(a + (b - a) * t);
+    return [mix(from[0], to[0]), mix(from[1], to[1]), mix(from[2], to[2])];
+}
+
+// Convert an xterm 256-colour index to RGB (colour cube and greys only)
+function xtermRgb(id: number): Rgb {
+    if (232 <= id) { const v = 8 + (id - 232) * 10; return [v, v, v]; }
+    const level = (i: number): number => i ? 55 + i * 40 : 0;
+    const n = id - 16;
+    return [level(Math.floor(n / 36)), level(Math.floor(n / 6) % 6), level(n % 6)];
 }
 
 // Construct an ANSI colour coded glyph (using 256-colour mode IDs)

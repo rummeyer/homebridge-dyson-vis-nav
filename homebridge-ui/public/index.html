@@ -15,7 +15,7 @@
     .dy-msg       { margin-top: .75rem; margin-bottom: 0; font-size: .85rem; }
     .dy-link      { background: none; border: 0; padding: 0; font-size: .85rem;
                     text-decoration: underline; cursor: pointer; color: inherit; opacity: .75; }
-    .dy-hidden    { display: none; }
+    .dy-hidden    { display: none !important; }
     .dy-tabs      { margin-bottom: 1.25rem; }
     .dy-tabs .nav-link { cursor: pointer; }
     .dy-clean     { display: flex; justify-content: space-between; gap: .75rem; flex-wrap: wrap;
@@ -23,7 +23,8 @@
     .dy-clean small { opacity: .75; }
     .dy-map       { margin-top: 1rem; padding: .75rem; background: #000; border-radius: .375rem;
                     overflow-x: auto; }
-    .dy-map canvas { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+    .dy-map canvas, .dy-map img { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+    .dy-views     { display: flex; justify-content: flex-end; margin-bottom: .75rem; }
     .dy-legend    { margin: .5rem 0 0; font-size: .75rem; color: #bbb; text-align: center; }
 </style>
 
@@ -89,9 +90,18 @@
         appears here shortly after it finishes. This needs the MyDyson account, because the
         map comes from Dyson's cloud.</div>
     <div id="dyCleanMap" class="dy-map dy-hidden">
+        <div class="dy-views">
+            <div class="btn-group btn-group-sm" role="group" aria-label="Map style">
+                <button type="button" class="btn btn-outline-light" id="dyViewImage">Image</button>
+                <button type="button" class="btn btn-outline-light" id="dyViewText">Terminal</button>
+            </div>
+        </div>
+        <img id="dyCleanImage" alt="Map of the selected clean">
         <canvas id="dyCleanCanvas"></canvas>
-        <div class="dy-legend">Brighter = more dust &middot; &#9675; dock &middot; &#8252; fault
-            &middot; &#9642; room boundary</div>
+        <div class="dy-legend" id="dyLegendImage">Brighter = more dust &middot; blue dot = dock
+            &middot; yellow dot = fault &middot; white lines = room boundaries</div>
+        <div class="dy-legend" id="dyLegendText">Brighter = more dust &middot; &#9675; dock
+            &middot; &#8252; fault &middot; &#9642; room boundary</div>
     </div>
     <button type="button" class="btn btn-sm btn-danger mt-3" id="dyCleanReset">Reset data</button>
 </div>
@@ -353,12 +363,46 @@
         return { title, facts: facts.join(' \u00B7 '), zones: (clean.zones ?? []).join(', ') };
     };
 
+    // Which view of the map to show, remembered in this browser only
+    let view = 'image';
+    try { view = localStorage.getItem('dyson-vis-nav:map-view') ?? view; } catch { /* default */ }
+    let hasImage = false;
+
+    // Show the chosen view; the text map stands in for a clean without an image
+    const showView = () => {
+        const image = view === 'image' && hasImage;
+        $('dyViewImage').classList.toggle('active', image);
+        $('dyViewText').classList.toggle('active', !image);
+        $('dyViewImage').disabled = !hasImage;
+        $('dyCleanImage').classList.toggle('dy-hidden', !image);
+        $('dyLegendImage').classList.toggle('dy-hidden', !image);
+        $('dyCleanCanvas').classList.toggle('dy-hidden', image);
+        $('dyLegendText').classList.toggle('dy-hidden', image);
+    };
+    const setView = chosen => {
+        view = chosen;
+        try { localStorage.setItem('dyson-vis-nav:map-view', view); } catch { /* not remembered */ }
+        showView();
+    };
+    $('dyViewImage').addEventListener('click', () => { setView('image'); });
+    $('dyViewText').addEventListener('click',  () => { setView('text'); });
+
     // Show the map of the selected clean
+    let selecting = 0;
     const select = async (clean, button) => {
         for (const b of $('dyCleanList').children) b.classList.toggle('active', b === button);
+        const current = ++selecting;
+        const which = { serialNumber: clean.serialNumber, id: clean.id };
         try {
-            const record = await homebridge.request('/clean', { serialNumber: clean.serialNumber, id: clean.id });
+            const [record, image] = await Promise.all([
+                homebridge.request('/clean', which),
+                homebridge.request('/clean-image', which).catch(() => undefined)
+            ]);
+            if (current !== selecting) return;      // another clean was selected meanwhile
             drawMap(record.mapLines);
+            hasImage = Boolean(image?.png);
+            if (hasImage) $('dyCleanImage').src = `data:image/png;base64,${image.png}`;
+            showView();
             $('dyCleanMap').classList.remove('dy-hidden');
         } catch (err) {
             $('dyCleanMap').classList.add('dy-hidden');

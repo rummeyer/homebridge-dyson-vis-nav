@@ -113,6 +113,23 @@ export async function readCleanRecord(
     return readRecord(Path.join(cleanHistoryRoot(storagePath), serialNumber), id);
 }
 
+// Read the cloud data stored with a clean
+export async function readCleanRaw(
+    storagePath:    string,
+    serialNumber:   string,
+    id:             string
+): Promise<CleanRecordRaw | undefined> {
+    // (called from the settings page with whatever the browser sent)
+    if (typeof serialNumber !== 'string' || !SERIAL_PATTERN.test(serialNumber)) return undefined;
+    if (typeof id           !== 'string' || !ID_PATTERN.test(id))               return undefined;
+    try {
+        const path = Path.join(cleanHistoryRoot(storagePath), serialNumber, id + RAW_SUFFIX);
+        return JSON.parse(await readFile(path, 'utf8')) as CleanRecordRaw;
+    } catch {
+        return undefined;
+    }
+}
+
 // Read and sanity check one record file
 async function readRecord(dir: string, id: string): Promise<CleanRecord | undefined> {
     try {

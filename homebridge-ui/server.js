@@ -6,7 +6,8 @@ import NodePersist from 'node-persist';
 import Path from 'path';
 
 import { DysonCloudAuth } from '../dist/dyson-cloud.js';
-import { deleteCleanRecords, listCleanRecords, readCleanRecord } from '../dist/dyson-clean-history.js';
+import { deleteCleanRecords, listCleanRecords, readCleanRaw, readCleanRecord } from '../dist/dyson-clean-history.js';
+import { dysonRenderImage360VisNav } from '../dist/dyson-device-360-map.js';
 import { PLUGIN_NAME } from '../dist/settings.js';
 import { makeAuthConfig } from './auth-config.mjs';
 
@@ -25,6 +26,7 @@ class DysonUiServer extends HomebridgePluginUiServer {
         this.onRequest('/finish-auth',  request => this.finishAuth(request));
         this.onRequest('/cleans',       () => this.listCleans());
         this.onRequest('/clean',        request => this.readClean(request));
+        this.onRequest('/clean-image',  request => this.renderCleanImage(request));
         this.onRequest('/cleans/reset', () => this.resetCleans());
 
         this.ready();
@@ -164,6 +166,17 @@ class DysonUiServer extends HomebridgePluginUiServer {
         const record = await readCleanRecord(this.homebridgeStoragePath, request?.serialNumber, request?.id);
         if (!record) throw new RequestError('That clean is no longer stored.');
         return record;
+    }
+
+    // Draw one stored clean as a PNG image from the cloud data kept with it.
+    // Rendered on request rather than stored, so a better drawing applies to
+    // every clean already stored.
+    async renderCleanImage(request) {
+        const raw = await readCleanRaw(this.homebridgeStoragePath, request?.serialNumber, request?.id);
+        if (!raw) throw new RequestError('No image data is stored for that clean.');
+        const { log } = this.createLogger();
+        const png = dysonRenderImage360VisNav(log, raw.clean, raw.persistentMap);
+        return { png: png.toString('base64') };
     }
 
     // Delete every stored clean; the plugin starts a new list with the next one

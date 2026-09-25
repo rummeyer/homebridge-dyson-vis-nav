@@ -168,16 +168,23 @@ Open the plugin's settings in Homebridge and switch to the **Recent Cleans** tab
 - how often the robot had to recharge, if it did
 - the rooms it cleaned — rooms it only drove through on the way are left out
 
-Select a clean to see its map. It is drawn the way the Homebridge log shows it in a terminal, one character per cell:
+Select a clean to see its map. The switch above the map picks one of two views, and your browser remembers the choice:
 
-| On the map | Means |
-|---|---|
-| purple → red → orange → yellow → white | cleaned floor, coloured by how much dust the robot picked up there; the brighter, the dirtier |
-| dark grey | a room on your map that this clean did not cover |
-| white dots | room boundaries |
-| ○ on blue | the dock |
-| ‼ | where the robot reported a fault |
-| faint grid | outside your map |
+- **Image** — a picture at full resolution, one pixel for every 2 cm of floor, with the dust levels blended smoothly. This is the default.
+- **Terminal** — the map exactly as the Homebridge log draws it in a terminal, one character per cell.
+
+Both use the same colours:
+
+| Image | Terminal | Means |
+|---|---|---|
+| purple → red → orange → yellow → white | the same, in blocks | cleaned floor, coloured by how much dust the robot picked up there; the brighter, the dirtier |
+| dark grey | dark grey | a room on your map that this clean did not cover |
+| thin white lines | white dots | room boundaries |
+| blue dot | ○ on blue | the dock |
+| yellow dot | ‼ | where the robot reported a fault |
+| black | faint grid | outside your map |
+
+The image is drawn from the cloud data stored with each clean when you open it, so every stored clean has one — including cleans stored before the image existed.
 
 **Where the maps come from.** When the robot finishes a clean, the plugin asks Dyson's cloud for the clean's map — the same data the MyDyson app shows — and stores it locally. Storing matters because Dyson's cloud keeps only your last few cleans (five, at the time of writing); the plugin keeps ten, and the list keeps working when the cloud does not answer.
 

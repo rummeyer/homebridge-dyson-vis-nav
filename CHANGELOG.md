@@ -11,6 +11,16 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+### Added
+
+- **Maps of recent cleans as real images.** The Recent Cleans tab now shows
+  each map as a picture at full resolution — one pixel per 2 cm of floor,
+  with smoothly blended dust levels, thin room boundaries and round markers
+  for the dock and any fault. A switch above the map goes back to the
+  terminal-style map, and the browser remembers which you chose. The image is
+  drawn from the cloud data already stored with each clean, so it works for
+  every clean stored since 1.1.0.
+
 ## [1.1.1] — 2026-09-25
 
 ### Added
