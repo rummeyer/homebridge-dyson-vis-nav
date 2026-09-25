@@ -6,6 +6,7 @@ import NodePersist from 'node-persist';
 import Path from 'path';
 
 import { DysonCloudAuth } from '../dist/dyson-cloud.js';
+import { listCleanRecords, readCleanRecord } from '../dist/dyson-clean-history.js';
 import { PLUGIN_NAME } from '../dist/settings.js';
 import { makeAuthConfig } from './auth-config.mjs';
 
@@ -22,6 +23,8 @@ class DysonUiServer extends HomebridgePluginUiServer {
         this.onRequest('/auth-status', request => this.authStatus(request));
         this.onRequest('/start-auth',   request => this.startAuth(request));
         this.onRequest('/finish-auth',  request => this.finishAuth(request));
+        this.onRequest('/cleans',       () => this.listCleans());
+        this.onRequest('/clean',        request => this.readClean(request));
 
         this.ready();
     }
@@ -146,6 +149,20 @@ class DysonUiServer extends HomebridgePluginUiServer {
         } catch (err) {
             throw new RequestError(`Could not complete authorisation: ${describeError(err)}`, { log: lines });
         }
+    }
+
+    // List the completed cleans the running plugin has stored, newest first.
+    // These are read from disk rather than the cloud, so the list works while
+    // Dyson is unreachable or the authorisation has lapsed.
+    async listCleans() {
+        return { cleans: await listCleanRecords(this.homebridgeStoragePath) };
+    }
+
+    // Read one stored clean, including its map
+    async readClean(request) {
+        const record = await readCleanRecord(this.homebridgeStoragePath, request?.serialNumber, request?.id);
+        if (!record) throw new RequestError('That clean is no longer stored.');
+        return record;
     }
 }
 

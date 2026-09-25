@@ -83,7 +83,7 @@ if (existsSync(join(root, indexRel))) {
     check(html.includes('homebridge.showSchemaForm()'),
           `${indexRel}: does not call homebridge.showSchemaForm() — the custom UI replaces the `
         + 'configuration form, so the plugin settings would be unreachable');
-    check(!/\btab\b/i.test(html),
+    check(!/\btab\b/i.test(html) || html.includes('role="tab"'),
           `${indexRel}: mentions a "tab"; the custom UI has none, which misleads users`);
 }
 

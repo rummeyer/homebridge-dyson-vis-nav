@@ -11,6 +11,25 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+### Added
+
+- **Maps of your last 10 cleans, on a Recent Cleans tab in the plugin's
+  settings.** Select a clean to see its map in colour, drawn the way the log's
+  monospaced map looks in a terminal, next to when it finished, the area, how
+  long it took and the rooms it cleaned. The plugin stores each clean under the Homebridge storage path
+  when the robot finishes it, so the list works while Dyson's cloud is
+  unreachable. After an update, it fetches the most recent clean once so the
+  list does not start empty. The raw cloud data is kept alongside each map, so
+  the map can later be drawn differently without losing earlier cleans. Needs
+  the MyDyson account.
+
+### Changed
+
+- **With Clean Map Logging off, the log still says how much was cleaned.**
+  The plugin now fetches every finished clean to store it, so the area and the
+  number of charges appear in the log whatever the setting; only the map
+  itself stays out of the log.
+
 ## [1.0.6] — 2026-09-23
 
 ### Changed

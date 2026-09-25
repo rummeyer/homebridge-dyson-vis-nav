@@ -16,9 +16,23 @@
     .dy-link      { background: none; border: 0; padding: 0; font-size: .85rem;
                     text-decoration: underline; cursor: pointer; color: inherit; opacity: .75; }
     .dy-hidden    { display: none; }
+    .dy-tabs      { margin-bottom: 1.25rem; }
+    .dy-tabs .nav-link { cursor: pointer; }
+    .dy-clean     { display: flex; justify-content: space-between; gap: .75rem; flex-wrap: wrap;
+                    text-align: left; }
+    .dy-clean small { opacity: .75; }
+    .dy-map       { margin-top: 1rem; padding: .75rem; background: #000; border-radius: .375rem;
+                    overflow-x: auto; }
+    .dy-map canvas { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+    .dy-legend    { margin: .5rem 0 0; font-size: .75rem; color: #bbb; text-align: center; }
 </style>
 
-<div class="dy-box">
+<ul class="nav nav-tabs dy-tabs" role="tablist">
+    <li class="nav-item"><button type="button" class="nav-link active" id="dyTabSettings" role="tab">Settings</button></li>
+    <li class="nav-item"><button type="button" class="nav-link" id="dyTabCleans" role="tab">Recent Cleans</button></li>
+</ul>
+
+<div class="dy-box" id="dySettings">
     <h5>MyDyson Account</h5>
     <div class="dy-hint">
         Nothing to do in the MyDyson app &mdash; <em>Request code</em> asks Dyson to email you one.
@@ -65,6 +79,20 @@
     </div>
 
     <div id="dyMsg" class="alert dy-msg dy-hidden" role="alert"></div>
+</div>
+
+<div class="dy-box dy-hidden" id="dyCleans">
+    <div class="dy-hint">The last 10 cleans, stored when the robot finishes each one.
+        Select one to see its map.</div>
+    <div id="dyCleanList" class="list-group"></div>
+    <div id="dyCleanNone" class="dy-hint dy-hidden" style="margin:0">No cleans stored yet. Each clean
+        appears here shortly after it finishes. This needs the MyDyson account, because the
+        map comes from Dyson's cloud.</div>
+    <div id="dyCleanMap" class="dy-map dy-hidden">
+        <canvas id="dyCleanCanvas"></canvas>
+        <div class="dy-legend">Brighter = more dust &middot; &#9675; dock &middot; &#8252; fault
+            &middot; &#9642; room boundary</div>
+    </div>
 </div>
 
 <script>
@@ -212,5 +240,179 @@
     });
 
     void load();
+})();
+
+// Recent cleans and their maps, on a tab of their own.
+//
+// Homebridge always draws the schema-generated form below this page, so the
+// cleans cannot follow the settings; instead the tab hides the form and the
+// account box, giving the map the full width.
+//
+// The plugin renders each map as lines of text for a monospaced terminal, with
+// ANSI 256-colour escape codes. Drawing those on a canvas, a cell at a time,
+// keeps the block elements seamless and aligned, which HTML text in a browser
+// font cannot promise.
+(() => {
+    const $ = id => document.getElementById(id);
+
+    // Character cell, in CSS pixels, with the 5:9 aspect the map assumes
+    const CELL_W = 7;
+    const CELL_H = CELL_W * 9 / 5;
+
+    // Quadrature block elements; the index is the set of quadrants filled
+    // (1 top left, 2 top right, 4 bottom left, 8 bottom right)
+    const QUADRANTS = ' \u2598\u259D\u2580\u2596\u258C\u259E\u259B\u2597\u259A\u2590\u259C\u2584\u2599\u259F\u2588';
+
+    // Convert an xterm 256-colour index to CSS
+    const xterm = n => {
+        const BASIC = ['#000', '#800000', '#008000', '#808000', '#000080', '#800080', '#008080', '#c0c0c0',
+                       '#808080', '#f00', '#0f0', '#ff0', '#00f', '#f0f', '#0ff', '#fff'];
+        if (n < 16) return BASIC[n];
+        if (n >= 232) { const v = 8 + (n - 232) * 10; return `rgb(${v},${v},${v})`; }
+        const level = i => i ? 55 + i * 40 : 0;
+        n -= 16;
+        return `rgb(${level(Math.floor(n / 36))},${level(Math.floor(n / 6) % 6)},${level(n % 6)})`;
+    };
+
+    // Split a line into cells of { char, fg, bg }
+    const parseLine = line => {
+        const cells = [];
+        let fg = '#ccc', bg = '#000';
+        for (const [, codes, char] of line.matchAll(/\u001B\[([0-9;]*)m|(.)/gsu)) {
+            if (char !== undefined) { cells.push({ char, fg, bg }); continue; }
+            const params = codes.split(';').map(Number);
+            for (let i = 0; i < params.length; ++i) {
+                const p = params[i];
+                if (p === 0)                              { fg = '#ccc'; bg = '#000'; }
+                else if (p === 39)                        fg = '#ccc';
+                else if (p === 49)                        bg = '#000';
+                else if ((p === 38 || p === 48) && params[i + 1] === 5) {
+                    const colour = xterm(params[i + 2]);
+                    if (p === 38) fg = colour; else bg = colour;
+                    i += 2;
+                }
+            }
+        }
+        return cells;
+    };
+
+    // Draw a map onto the canvas
+    const drawMap = lines => {
+        const rows = lines.map(parseLine);
+        const cols = Math.max(1, ...rows.map(r => r.length));
+        const dpr = window.devicePixelRatio || 1;
+        const canvas = $('dyCleanCanvas');
+        canvas.width  = Math.round(cols * CELL_W * dpr);
+        canvas.height = Math.round(rows.length * CELL_H * dpr);
+        canvas.style.width = `${cols * CELL_W}px`;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.font = `${Math.round(CELL_H * 0.8 * dpr)}px Menlo, Consolas, "DejaVu Sans Mono", monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // Snap to device pixels so neighbouring cells meet without seams
+        const x = c => Math.round(c * CELL_W * dpr);
+        const y = r => Math.round(r * CELL_H * dpr);
+        const fill = (colour, x0, y0, x1, y1) => { ctx.fillStyle = colour; ctx.fillRect(x0, y0, x1 - x0, y1 - y0); };
+        rows.forEach((cells, r) => cells.forEach(({ char, fg, bg }, c) => {
+            const [x0, xm, x1] = [x(c), x(c + 0.5), x(c + 1)];
+            const [y0, ym, y1] = [y(r), y(r + 0.5), y(r + 1)];
+            fill(bg, x0, y0, x1, y1);
+            const quadrants = QUADRANTS.indexOf(char);
+            if (0 < quadrants) {
+                if (quadrants & 1) fill(fg, x0, y0, xm, ym);
+                if (quadrants & 2) fill(fg, xm, y0, x1, ym);
+                if (quadrants & 4) fill(fg, x0, ym, xm, y1);
+                if (quadrants & 8) fill(fg, xm, ym, x1, y1);
+            } else if (quadrants < 0 && char.trim()) {
+                ctx.fillStyle = fg;
+                ctx.fillText(char, (x0 + x1) / 2, (y0 + y1) / 2);
+            }
+        }));
+    };
+
+    // Describe a clean for the list
+    const describe = clean => {
+        const when = clean.finished ?? clean.started;
+        const title = when
+            ? new Date(when).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short',
+                                                         hour: '2-digit', minute: '2-digit' })
+            : 'Unknown time';
+        const facts = [];
+        if (clean.cleanedArea) {
+            facts.push(`${clean.cleanedArea.toLocaleString(undefined, { maximumFractionDigits: 1 })} m\u00B2`);
+        }
+        if (clean.cleanDuration) {
+            const minutes = Math.round(clean.cleanDuration / 60);
+            facts.push(minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`);
+        }
+        if (clean.charges) facts.push(`${clean.charges} charge${clean.charges === 1 ? '' : 's'}`);
+        return { title, facts: facts.join(' \u00B7 '), zones: (clean.zones ?? []).join(', ') };
+    };
+
+    // Show the map of the selected clean
+    const select = async (clean, button) => {
+        for (const b of $('dyCleanList').children) b.classList.toggle('active', b === button);
+        try {
+            const record = await homebridge.request('/clean', { serialNumber: clean.serialNumber, id: clean.id });
+            drawMap(record.mapLines);
+            $('dyCleanMap').classList.remove('dy-hidden');
+        } catch (err) {
+            $('dyCleanMap').classList.add('dy-hidden');
+            homebridge.toast.error(err.message, 'Recent Cleans');
+        }
+    };
+
+    // Load the list of stored cleans
+    const load = async () => {
+        let cleans = [];
+        try {
+            ({ cleans } = await homebridge.request('/cleans'));
+        } catch { /* shown as empty */ }
+        const list = $('dyCleanList');
+        list.replaceChildren();
+        $('dyCleanNone').classList.toggle('dy-hidden', cleans.length > 0);
+        for (const clean of cleans) {
+            const { title, facts, zones } = describe(clean);
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'list-group-item list-group-item-action';
+            const head = document.createElement('div');
+            head.className = 'dy-clean';
+            const strong = document.createElement('strong');
+            strong.textContent = title;
+            const small = document.createElement('small');
+            small.textContent = facts;
+            head.append(strong, small);
+            button.append(head);
+            if (zones) {
+                const rooms = document.createElement('small');
+                rooms.style.opacity = '.75';
+                rooms.textContent = zones;
+                button.append(rooms);
+            }
+            button.addEventListener('click', () => { void select(clean, button); });
+            list.append(button);
+        }
+        if (cleans.length) void select(cleans[0], list.firstElementChild);
+    };
+
+    // Switch between the settings and the cleans
+    const showTab = cleansTab => {
+        $('dyTabSettings').classList.toggle('active', !cleansTab);
+        $('dyTabCleans').classList.toggle('active', cleansTab);
+        $('dySettings').classList.toggle('dy-hidden', cleansTab);
+        $('dyCleans').classList.toggle('dy-hidden', !cleansTab);
+        if (cleansTab) {
+            homebridge.hideSchemaForm();
+            void load();
+        } else {
+            homebridge.showSchemaForm();
+        }
+    };
+    $('dyTabSettings').addEventListener('click', () => { showTab(false); });
+    $('dyTabCleans').addEventListener('click',   () => { showTab(true); });
 })();
 </script>

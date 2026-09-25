@@ -33,6 +33,7 @@ Your robot appears in the Home app as a genuine **robot vacuum cleaner**, with t
 - **What it is doing right now** — cleaning, paused, heading for the dock, charging, docked
 - **Problems, in plain language** — bin full or missing, stuck, wheels jammed, sensor obscured, and more
 - **Room cleaning**, for the rooms you have mapped in the MyDyson app
+- **Maps of your last 10 cleans** in the plugin's settings — see [Maps of recent cleans](#maps-of-recent-cleans)
 - **Siri**: *"Hey Siri, start the vacuum"*, *"Hey Siri, send the vacuum to its dock"*
 
 That is what you get with Matter enabled. Without it you still get a switch, a battery and a problem sensor — see [Why Matter matters](#why-matter-matters).
@@ -118,6 +119,7 @@ You can also switch Matter on globally, under **Settings** → **Matter**, and s
 |---|---|
 | **Email address, password** | Homebridge's `config.json`, **in plain text** |
 | **Access token** | the plugin's own storage, under the Homebridge storage path |
+| **Your last 10 cleans** | `homebridge-dyson-vis-nav/cleans/` under the Homebridge storage path — each clean's map as Dyson's cloud returned it, about 400 kB per clean |
 
 Credentials in `config.json` are normal for Homebridge plugins, but worth knowing: anything that can read your Homebridge configuration — including a configuration backup — can read that password.
 
@@ -157,6 +159,32 @@ The robot is **not** part of the Homebridge bridge you have already paired. Appl
 
 **When the robot is out of reach.** If it stops responding — off its dock in a dead spot, or the network is down — the plugin keeps showing the last state it saw for a couple of minutes, so a brief dropout does not make the tile flicker. After that it reports the robot's activity as unknown rather than claiming it is still cleaning. The wait is adjustable (**Unreachable Timeout**).
 
+### Maps of recent cleans
+
+Open the plugin's settings in Homebridge and switch to the **Recent Cleans** tab. It lists your last 10 cleans, newest first:
+
+- when the clean finished
+- how much floor it covered, and how long it took
+- how often the robot had to recharge, if it did
+- the rooms it cleaned — rooms it only drove through on the way are left out
+
+Select a clean to see its map. It is drawn the way the Homebridge log shows it in a terminal, one character per cell:
+
+| On the map | Means |
+|---|---|
+| purple → red → orange → yellow → white | cleaned floor, coloured by how much dust the robot picked up there; the brighter, the dirtier |
+| dark grey | a room on your map that this clean did not cover |
+| white dots | room boundaries |
+| ○ | the dock |
+| ‼ | where the robot reported a fault |
+| faint grid | outside your map |
+
+**Where the maps come from.** When the robot finishes a clean, the plugin asks Dyson's cloud for the clean's map — the same data the MyDyson app shows — and stores it locally, so the list keeps working when the cloud does not answer. After you install or update the plugin, it fetches the most recent clean once, so the list does not start empty. The durations of cleans stored this way are unknown and left out.
+
+**What it needs.** The MyDyson account from [Step 3](#step-3--connect-your-mydyson-account). Without it the plugin cannot reach the maps and the list stays empty.
+
+**Maps in the log as well.** Set **Clean Map Logging** to draw each map into the Homebridge log too. Pick *Homebridge* for the log viewer in the Homebridge UI, whose font would scramble the *Monospaced* style, and *Monospaced* for a terminal (`tail -f` over SSH). The map in the log appears shortly after the clean ends, once the plugin has fetched it.
+
 ---
 
 ## Settings
@@ -169,7 +197,7 @@ Everything below has a sensible default; you can ignore all of it.
 | **Serial Number Allow List** | empty | Leave empty to add every robot vacuum in your account. Add serial numbers to pick specific ones |
 | **Use simple RVC Clean Mode tags** | on | Describes each cleaning mode with one tag instead of several. Turn off only if your controller needs the full set |
 | **Subscribe to wildcard MQTT topic** | off | Listens to everything the robot publishes. Useful when capturing a log for a bug report |
-| **Clean Map Logging** | Off | Draws a map of each finished clean into the Homebridge log |
+| **Clean Map Logging** | Off | Also draws the map of each finished clean into the Homebridge log. The settings page shows the maps either way |
 | **Unreachable Timeout** | 120 s | How long the robot may stay silent before the Home app is told its activity is unknown |
 | **Enable debug logging** | off | Much more detail in the log |
 | **Debug Features** | none | Individual extras — API headers and bodies, MQTT payloads. Turn these on only when asked to |

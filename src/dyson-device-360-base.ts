@@ -41,6 +41,7 @@ import {
 import { MaybePromise } from './utils.js';
 import { VendorId } from './matter-clusters.js';
 import { setTimeout } from 'node:timers/promises';
+import { CleanRecordRaw, makeCleanRecordId, saveCleanRecord } from './dyson-clean-history.js';
 
 // Details of a completed clean
 export interface Dyson360CleanSummary {
@@ -48,11 +49,22 @@ export interface Dyson360CleanSummary {
     cleanDuration?: number  // seconds
     cleanedArea?:   number, // m²
     mapLines?:      string[],
+    history?:       Dyson360CleanHistoryData
+}
+
+// Details of a completed clean to keep for the settings page
+export interface Dyson360CleanHistoryData {
+    cleanId:        string,
+    started?:       string,     // ISO 8601
+    finished?:      string,     // ISO 8601
+    zones:          string[],
+    mapLines:       string[],   // always rendered for a monospaced terminal
+    raw:            CleanRecordRaw
 }
 export type Dyson360CleanSummaryUnavailable =
     'Not found'     // Clean not found in history (retry)
   | 'Not ready'     // Clean has not finished (retry)
-  | 'Unavailable';  // No API or map rendering disabled
+  | 'Unavailable';  // No MyDyson API
 export type Dyson360CleanSummaryResult = Dyson360CleanSummary | Dyson360CleanSummaryUnavailable;
 
 // Retry configuration for retrieving details of a completed clean
@@ -275,7 +287,7 @@ export abstract class DysonDevice360Base
                 }
                 break;
             case 'Unavailable':
-                // Not using MyDyson API or map rendering disabled
+                // Not using MyDyson API
                 return {};
             default:
                 // Success
@@ -298,6 +310,28 @@ export abstract class DysonDevice360Base
         if (cleanDuration)          parts.push(`in ${formatSeconds(cleanDuration)}`);
         if (parts.length) this.log.info(`Cleaned ${parts.join(' ')}`);
         for (const line of mapLines ?? []) this.log.info(line);
+
+        // Keep the clean for the settings page
+        await this.saveCleanHistory(result, cleanDuration);
+    }
+
+    // Store a completed clean so the settings page can show its map
+    async saveCleanHistory(summary: Dyson360CleanSummary, cleanDuration?: number): Promise<void> {
+        const { history } = summary;
+        if (!history) return;
+        try {
+            const { raw, ...details } = history;
+            await saveCleanRecord(this.hbApi.user.storagePath(), {
+                ...details,
+                id:             makeCleanRecordId(history.cleanId, history.finished),
+                serialNumber:   this.serialNumber,
+                cleanDuration,
+                cleanedArea:    summary.cleanedArea,
+                charges:        summary.charges
+            }, raw);
+        } catch (err) {
+            logError(this.log, 'Saving clean history', err);
+        }
     }
 
     // Construct a command to set power level based on an RVC Clean Mode
