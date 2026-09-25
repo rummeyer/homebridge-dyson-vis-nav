@@ -23,7 +23,11 @@
     .dy-clean small { opacity: .75; }
     .dy-map       { margin-top: 1rem; padding: .75rem; background: #000; border-radius: .375rem;
                     overflow-x: auto; }
-    .dy-map img   { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+    .dy-map-frame { position: relative; width: fit-content; max-width: 100%; margin: 0 auto; }
+    .dy-map img   { display: block; max-width: 100%; height: auto; }
+    .dy-room      { position: absolute; transform: translate(-50%, -50%); pointer-events: none;
+                    font-size: .7rem; font-weight: 600; line-height: 1; white-space: nowrap; color: #fff;
+                    text-shadow: 0 0 2px #000, 0 0 3px #000, 0 0 4px #000; }
     .dy-legend    { margin: .5rem 0 0; font-size: .75rem; color: #bbb; text-align: center; }
 </style>
 
@@ -89,9 +93,11 @@
         appears here shortly after it finishes. This needs the MyDyson account, because the
         map comes from Dyson's cloud.</div>
     <div id="dyCleanMap" class="dy-map dy-hidden">
-        <img id="dyCleanImage" alt="Map of the selected clean">
+        <div class="dy-map-frame" id="dyCleanFrame">
+            <img id="dyCleanImage" alt="Map of the selected clean">
+        </div>
         <div class="dy-legend">Brighter = more dust &middot; blue dot = dock
-            &middot; yellow dot = fault &middot; white lines = room boundaries</div>
+            &middot; yellow dot = fault &middot; white lines = walls &middot; grey lines = room dividers</div>
     </div>
     <button type="button" class="btn btn-sm btn-danger mt-3" id="dyCleanReset">Reset data</button>
 </div>
@@ -277,9 +283,21 @@
         for (const b of $('dyCleanList').children) b.classList.toggle('active', b === button);
         const current = ++selecting;
         try {
-            const { png } = await homebridge.request('/clean-image', { serialNumber: clean.serialNumber, id: clean.id });
+            const { png, rooms } = await homebridge.request('/clean-image', { serialNumber: clean.serialNumber, id: clean.id });
             if (current !== selecting) return;      // another clean was selected meanwhile
             $('dyCleanImage').src = `data:image/png;base64,${png}`;
+
+            // Set the room names over the image, positioned as fractions of
+            // its size so that they follow it when it is scaled down
+            const labels = (rooms ?? []).map(({ name, x, y }) => {
+                const label = document.createElement('span');
+                label.className = 'dy-room';
+                label.textContent = name;
+                label.style.left = `${x * 100}%`;
+                label.style.top  = `${y * 100}%`;
+                return label;
+            });
+            $('dyCleanFrame').replaceChildren($('dyCleanImage'), ...labels);
             $('dyCleanMap').classList.remove('dy-hidden');
         } catch (err) {
             $('dyCleanMap').classList.add('dy-hidden');

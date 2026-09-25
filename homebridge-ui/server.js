@@ -160,15 +160,16 @@ class DysonUiServer extends HomebridgePluginUiServer {
         return { cleans: await listCleanRecords(this.homebridgeStoragePath) };
     }
 
-    // Draw one stored clean as a PNG image from the cloud data kept with it.
+    // Draw one stored clean as a PNG image from the cloud data kept with it,
+    // with the names of its rooms and where to place them over the image.
     // Rendered on request rather than stored, so a better drawing applies to
     // every clean already stored.
     async renderCleanImage(request) {
         const raw = await readCleanRaw(this.homebridgeStoragePath, request?.serialNumber, request?.id);
         if (!raw) throw new RequestError('No image data is stored for that clean.');
         const { log } = this.createLogger();
-        const png = dysonRenderImage360VisNav(log, raw.clean, raw.persistentMap);
-        return { png: png.toString('base64') };
+        const { png, rooms } = dysonRenderImage360VisNav(log, raw.clean, raw.persistentMap);
+        return { png: png.toString('base64'), rooms };
     }
 
     // Delete every stored clean; the plugin starts a new list with the next one

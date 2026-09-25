@@ -11,6 +11,13 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+### Added
+
+- **Clean maps show the rooms.** Each room on the Recent Cleans tab has its
+  own tint and its name, with grey lines where one room meets the next, taken
+  from the rooms defined in the MyDyson app. Cleans already stored show them
+  too.
+
 ## [1.3.1] — 2026-09-25
 
 ### Changed

@@ -125,7 +125,10 @@ function prepareMap360VisNav(
         clean.cleanedFootprint.resolution,
         clean.dustMap.resolution
     ]);
-    if (map) resolutions.add(map.presentationMap.resolution);
+    if (map) {
+        resolutions.add(map.presentationMap.resolution);
+        resolutions.add(map.zonesDefinition.zonesMap.resolution);
+    }
     if (resolutions.size !== 1) throw new Error(`Multiple bitmap resolutions not supported (${[...resolutions].join(' ≠ ')})`);
     const [mmPerPixel] = resolutions;
     assertIsDefined(mmPerPixel);
@@ -141,6 +144,8 @@ function prepareMap360VisNav(
     // If the clean is associated with a map then parse its presentation map
     let presentationBitmap: DysonBitmapOctet;
     let presentationOrigin: { x: number, y: number } | undefined;
+    let zonesBitmap:        DysonBitmapOctet;
+    let zonesOrigin:        { x: number, y: number } | undefined;
     if (clean.persistentMap && map) {
         // Parse the presentation map image and add the dock. The cloud also
         // keeps every place the dock used to stand, with nothing to tell them
@@ -155,10 +160,21 @@ function prepareMap360VisNav(
             x:  (offset.x - cleanMapPosition.x) / mmPerPixel,
             y:  (offset.y - cleanMapPosition.y) / mmPerPixel
         };
+
+        // Parse the rooms: each pixel's grey level is the id of its zone (0
+        // outside every zone), positioned by its own offset rather than the
+        // presentation map's, which differs
+        const { zonesMap, persistentMapOffset } = map.zonesDefinition;
+        zonesBitmap = DysonBitmapOctet.fromPNG(Buffer.from(zonesMap.data, 'base64'), rgba => rgba >>> 24);
+        zonesOrigin = {
+            x:  (persistentMapOffset.x - cleanMapPosition.x) / mmPerPixel,
+            y:  (persistentMapOffset.y - cleanMapPosition.y) / mmPerPixel
+        };
     } else {
-        // No persistent map, so create an empty presentation bitmap
+        // No persistent map, so create empty presentation and zone bitmaps
         const emptyBuffer = Buffer.alloc(1, Dyson360VisNavPresentationOctet.Empty);
         presentationBitmap = new DysonBitmapOctet(1, 1, emptyBuffer);
+        zonesBitmap = new DysonBitmapOctet(1, 1, Buffer.alloc(1));
     }
 
     // Parse the cleaned footprint image and add any fault locations
@@ -181,7 +197,8 @@ function prepareMap360VisNav(
     const renderer = new DysonBitmapAnsi([
         { bitmap: cleanedBitmap },
         { bitmap: presentationBitmap, origin: presentationOrigin },
-        { bitmap: dustDataBitmap }
+        { bitmap: dustDataBitmap },
+        { bitmap: zonesBitmap, origin: zonesOrigin }
     ]);
     renderer.invertY = true;
     renderer.rotation = map?.zonesDefinition.persistentMapDisplayOrientation ?? 0;
@@ -254,24 +271,68 @@ const IMAGE_COLOURS = {
     outside:    [  0,   0,   0],
     zone:       [ 42,  42,  46],
     boundary:   [205, 205, 210],
+    divider:    [140, 140, 150],
     dock:       [ 95,  95, 215],
     fault:      [255, 215,   0],
     marker:     [255, 255, 255]
 } as const satisfies Record<string, Rgb>;
 
+// Uncleaned floor of each room, dark enough for the dust colours to stand out
+// and for white room names to read on top
+const ROOM_COLOURS: readonly Rgb[] = [
+    [ 38,  52,  74], [ 70,  46,  44], [ 40,  64,  52], [ 70,  58,  36],
+    [ 58,  44,  74], [ 36,  62,  68], [ 72,  46,  62], [ 56,  62,  40]
+];
+
+// A room name and where to place it, as fractions of the image size
+export interface Dyson360MapRoomLabel {
+    name:   string;
+    x:      number;
+    y:      number;
+}
+
+// A Dyson 360 Vis Nav cleaned area image with its room names
+export interface Dyson360MapImage {
+    png:    Buffer;
+    rooms:  Dyson360MapRoomLabel[];
+}
+
 // Render a Dyson 360 Vis Nav cleaned area map as a PNG image, one pixel per
 // map pixel (typically 20 mm), coloured like the text map but with the dust
-// levels blended smoothly instead of in steps
+// levels blended smoothly instead of in steps, and the rooms told apart. The
+// names are returned rather than drawn so that the page can set them as text.
 export function dysonRenderImage360VisNav(
     log:    AnsiLogger,
     clean:  Dyson360CleanMap,
     map?:   Dyson360PersistentMapResponse
-): Buffer {
+): Dyson360MapImage {
     const { renderer, dustScale } = prepareMap360VisNav(log, clean, map);
     renderer.charAspectRatio = 1;
     const { width, height, readPixels } = renderer.prepareBitmaps(1);
 
+    // Read every pixel once, noting the room each belongs to
+    const pixels = Array.from({ length: width * height }, (_, i) => readPixels(i % width, Math.floor(i / width)) as
+        [Dyson360VisNavCleanedOctet, Dyson360VisNavPresentationOctet, number, number]);
+    const zoneAt = (x: number, y: number): number =>
+        (0 <= x && x < width && 0 <= y && y < height) ? pixels[y * width + x]?.[3] ?? 0 : 0;
+
+    // A pixel is on a divider if a neighbouring pixel lies in another room
+    // (both sides are marked, so the line is two pixels wide)
+    const onDivider = (x: number, y: number, zone: number): boolean => {
+        if (!zone) return false;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+            const other = zoneAt(x + dx, y + dy);
+            if (other && other !== zone) return true;
+        }
+        return false;
+    };
+
     // Colour each pixel, remembering where the markers go
+    const zones = map?.zonesDefinition.zones ?? [];
+    const roomColour = (zone: number): Rgb => {
+        const index = zones.findIndex(({ id }) => Number(id) === zone);
+        return index < 0 ? IMAGE_COLOURS.zone : ROOM_COLOURS[index % ROOM_COLOURS.length] ?? IMAGE_COLOURS.zone;
+    };
     const png = new PNG({ width, height });
     const docks: { x: number, y: number }[] = [];
     const faults: { x: number, y: number }[] = [];
@@ -282,19 +343,22 @@ export function dysonRenderImage360VisNav(
     };
     for (let y = 0; y < height; ++y) {
         for (let x = 0; x < width; ++x) {
-            const [cleaned, presentation, dust] = readPixels(x, y) as
-                [Dyson360VisNavCleanedOctet, Dyson360VisNavPresentationOctet, number];
+            const pixel = pixels[y * width + x];
+            assertIsDefined(pixel);
+            const [cleaned, presentation, dust, zone] = pixel;
             if (cleaned === Dyson360VisNavCleanedOctet.Fault) faults.push({ x, y });
             if (presentation === Dyson360VisNavPresentationOctet.Dock) docks.push({ x, y });
             let colour: Rgb;
             if (presentation === Dyson360VisNavPresentationOctet.Boundary) {
                 colour = IMAGE_COLOURS.boundary;
+            } else if (onDivider(x, y, zone)) {
+                colour = IMAGE_COLOURS.divider;
             } else if (cleaned !== Dyson360VisNavCleanedOctet.Empty) {
                 colour = dustColour(dust / dustScale);
             } else if (presentation === Dyson360VisNavPresentationOctet.Empty) {
                 colour = IMAGE_COLOURS.outside;
             } else {
-                colour = IMAGE_COLOURS.zone;
+                colour = roomColour(zone);
             }
             put(x, y, colour);
         }
@@ -317,7 +381,51 @@ export function dysonRenderImage360VisNav(
         disc(x, y, markerRadius + 2, IMAGE_COLOURS.outside);
         disc(x, y, markerRadius,     IMAGE_COLOURS.fault);
     }
-    return PNG.sync.write(png);
+
+    // Label each room at its point furthest from any other room or the outside,
+    // which stays inside rooms that are L-shaped or wrap around another
+    const labelAt = roomLabelPositions(width, height, zoneAt);
+    const rooms = zones.flatMap(({ id, name }) => {
+        const at = labelAt.get(Number(id));
+        return at ? [{ name, x: (at.x + 0.5) / width, y: (at.y + 0.5) / height }] : [];
+    });
+    return { png: PNG.sync.write(png), rooms };
+}
+
+// For each room, the pixel furthest from its edge (a two-pass chamfer distance)
+function roomLabelPositions(
+    width:  number,
+    height: number,
+    zoneAt: (x: number, y: number) => number
+): Map<number, { x: number, y: number }> {
+    const distance = new Float64Array(width * height);
+    const relax = (x: number, y: number, dx: number, dy: number, cost: number): void => {
+        const zone = zoneAt(x, y);
+        const i = y * width + x;
+        const nx = x + dx, ny = y + dy;
+        const neighbour = zoneAt(nx, ny) === zone ? distance[ny * width + nx] ?? 0 : 0;
+        distance[i] = Math.min(distance[i] ?? 0, neighbour + cost);
+    };
+    for (let y = 0; y < height; ++y) {
+        for (let x = 0; x < width; ++x) {
+            distance[y * width + x] = zoneAt(x, y) ? Infinity : 0;
+            if (!zoneAt(x, y)) continue;
+            relax(x, y, -1,  0, 1); relax(x, y,  0, -1, 1);
+            relax(x, y, -1, -1, Math.SQRT2); relax(x, y, 1, -1, Math.SQRT2);
+        }
+    }
+    const best = new Map<number, { x: number, y: number, distance: number }>();
+    for (let y = height - 1; 0 <= y; --y) {
+        for (let x = width - 1; 0 <= x; --x) {
+            const zone = zoneAt(x, y);
+            if (!zone) continue;
+            relax(x, y, 1,  0, 1); relax(x, y,  0, 1, 1);
+            relax(x, y, 1, 1, Math.SQRT2); relax(x, y, -1, 1, Math.SQRT2);
+            const d = distance[y * width + x] ?? 0;
+            if (d > (best.get(zone)?.distance ?? -1)) best.set(zone, { x, y, distance: d });
+        }
+    }
+    return new Map([...best].map(([zone, { x, y }]) => [zone, { x, y }]));
 }
 
 // Blend the dust level gradient smoothly (level 0 to 1)
