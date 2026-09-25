@@ -142,12 +142,13 @@ function prepareMap360VisNav(
     let presentationBitmap: DysonBitmapOctet;
     let presentationOrigin: { x: number, y: number } | undefined;
     if (clean.persistentMap && map) {
-        // Parse the presentation map image and add any dock locations
+        // Parse the presentation map image and add the dock. The cloud also
+        // keeps every place the dock used to stand, with nothing to tell them
+        // apart except order: the current one is the last.
         const presentationPNG = Buffer.from(map.presentationMap.data, 'base64');
         presentationBitmap = DysonBitmapOctet.fromPNGMapped(presentationPNG, RGBA_VIS_NAV_PRESENTATION);
-        for (const dock of map.dockLocations) {
-            setPixel(presentationBitmap, dock, Dyson360VisNavPresentationOctet.Dock);
-        }
+        const dock = map.dockLocations.at(-1);
+        if (dock) setPixel(presentationBitmap, dock, Dyson360VisNavPresentationOctet.Dock);
         const { cleanMapPosition } = clean.persistentMap;
         const { offset } = map;
         presentationOrigin = {

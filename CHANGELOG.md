@@ -21,6 +21,13 @@ the plugin; the reasoning behind each one is in the commit it came from.
   works for every clean stored since 1.1.0. The text map stays available in
   the Homebridge log through **Clean Map Logging**.
 
+### Fixed
+
+- **Maps mark only the current dock.** Dyson's cloud also keeps every place
+  the dock used to stand, and each of them was drawn as a dock, in the log's
+  map as well. The cloud lists the current dock last, and only that one is
+  drawn now.
+
 ### Changed
 
 - **Stored cleans no longer include a text map**, since the settings page no
