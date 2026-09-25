@@ -6,7 +6,7 @@ import NodePersist from 'node-persist';
 import Path from 'path';
 
 import { DysonCloudAuth } from '../dist/dyson-cloud.js';
-import { deleteCleanRecords, listCleanRecords, readCleanRaw, readCleanRecord } from '../dist/dyson-clean-history.js';
+import { deleteCleanRecords, listCleanRecords, readCleanRaw } from '../dist/dyson-clean-history.js';
 import { dysonRenderImage360VisNav } from '../dist/dyson-device-360-map.js';
 import { PLUGIN_NAME } from '../dist/settings.js';
 import { makeAuthConfig } from './auth-config.mjs';
@@ -25,7 +25,6 @@ class DysonUiServer extends HomebridgePluginUiServer {
         this.onRequest('/start-auth',   request => this.startAuth(request));
         this.onRequest('/finish-auth',  request => this.finishAuth(request));
         this.onRequest('/cleans',       () => this.listCleans());
-        this.onRequest('/clean',        request => this.readClean(request));
         this.onRequest('/clean-image',  request => this.renderCleanImage(request));
         this.onRequest('/cleans/reset', () => this.resetCleans());
 
@@ -159,13 +158,6 @@ class DysonUiServer extends HomebridgePluginUiServer {
     // Dyson is unreachable or the authorisation has lapsed.
     async listCleans() {
         return { cleans: await listCleanRecords(this.homebridgeStoragePath) };
-    }
-
-    // Read one stored clean, including its map
-    async readClean(request) {
-        const record = await readCleanRecord(this.homebridgeStoragePath, request?.serialNumber, request?.id);
-        if (!record) throw new RequestError('That clean is no longer stored.');
-        return record;
     }
 
     // Draw one stored clean as a PNG image from the cloud data kept with it.

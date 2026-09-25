@@ -85,13 +85,11 @@ export class DysonDevice360VisNav extends DysonDevice360ZonesMixin(DysonDevice36
         let persistentMap: Dyson360PersistentMapResponse | undefined;
         if (clean.persistentMap) persistentMap = await this.api.getPersistentMap360(clean.persistentMap.id);
 
-        // Render the map for the settings page, which always shows it monospaced,
-        // and again for the log if that uses a different style
-        const summary = dysonRenderMap360VisNav(this.log, 'Monospaced', clean, persistentMap);
+        // Render the map for the log; the area and charges come with it, so
+        // it is rendered even when the map itself is not logged
         const { logMapStyle } = this.config;
-        const logSummary = logMapStyle === 'Monospaced' ? summary
-                         : logMapStyle === 'Off'        ? { ...summary, mapLines: undefined }
-                         : dysonRenderMap360VisNav(this.log, logMapStyle, clean, persistentMap);
+        const summary = dysonRenderMap360VisNav(this.log, logMapStyle === 'Off' ? 'Monospaced' : logMapStyle, clean, persistentMap);
+        if (logMapStyle === 'Off') delete summary.mapLines;
 
         // Names of the zones cleaned, in the order first entered. The timeline
         // alone would also list rooms the robot only drove through.
@@ -105,13 +103,12 @@ export class DysonDevice360VisNav extends DysonDevice360ZonesMixin(DysonDevice36
             .flatMap(zone => zoneNames.get(zone) ?? []);
 
         return {
-            ...logSummary,
+            ...summary,
             history: {
                 cleanId,
                 started:    clean.cleanTimeline[0]?.time,
                 finished:   clean.cleanTimeline.at(-1)?.time,
                 zones,
-                mapLines:   summary.mapLines ?? [],
                 raw:        { clean, persistentMap }
             }
         };

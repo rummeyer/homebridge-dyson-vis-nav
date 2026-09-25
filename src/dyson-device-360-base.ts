@@ -58,7 +58,6 @@ export interface Dyson360CleanHistoryData {
     started?:       string,     // ISO 8601
     finished?:      string,     // ISO 8601
     zones:          string[],
-    mapLines:       string[],   // always rendered for a monospaced terminal
     raw:            CleanRecordRaw
 }
 export type Dyson360CleanSummaryUnavailable =

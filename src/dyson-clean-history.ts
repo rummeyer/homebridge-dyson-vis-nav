@@ -21,13 +21,8 @@ export interface CleanRecordSummary {
     zones:          string[];   // names of the zones visited, in order
 }
 
-// A completed clean with its map rendered for a monospaced terminal
-export interface CleanRecord extends CleanRecordSummary {
-    mapLines:       string[];   // ANSI 256-colour escape sequences
-}
-
-// Everything the cloud returned for the clean, kept so the map can later be
-// rendered differently without losing cleans that happened before then
+// Everything the cloud returned for the clean, from which the settings page
+// draws its map; kept whole so a better drawing applies to earlier cleans too
 export interface CleanRecordRaw {
     clean:          unknown;
     persistentMap?: unknown;
@@ -59,7 +54,7 @@ export function makeCleanRecordId(cleanId: string, finished?: string): string {
 // Save a completed clean and discard all but the most recent ones
 export async function saveCleanRecord(
     storagePath:    string,
-    record:         CleanRecord,
+    record:         CleanRecordSummary,
     raw:            CleanRecordRaw,
     limit =         CLEAN_HISTORY_LIMIT
 ): Promise<void> {
@@ -89,6 +84,7 @@ export async function listCleanRecords(storagePath: string): Promise<CleanRecord
         for (const id of await listIds(dir)) {
             const record = await readRecord(dir, id);
             if (!record) continue;
+            // (records from 1.1.x also carry a text map, which nothing reads now)
             const { mapLines: _mapLines, ...summary } = record;
             summaries.push(summary);
         }
@@ -99,18 +95,6 @@ export async function listCleanRecords(storagePath: string): Promise<CleanRecord
 // Delete every stored clean of every device
 export async function deleteCleanRecords(storagePath: string): Promise<void> {
     await rm(cleanHistoryRoot(storagePath), { recursive: true, force: true });
-}
-
-// Read a single stored clean, including its map
-export async function readCleanRecord(
-    storagePath:    string,
-    serialNumber:   string,
-    id:             string
-): Promise<CleanRecord | undefined> {
-    // (called from the settings page with whatever the browser sent)
-    if (typeof serialNumber !== 'string' || !SERIAL_PATTERN.test(serialNumber)) return undefined;
-    if (typeof id           !== 'string' || !ID_PATTERN.test(id))               return undefined;
-    return readRecord(Path.join(cleanHistoryRoot(storagePath), serialNumber), id);
 }
 
 // Read the cloud data stored with a clean
@@ -131,10 +115,11 @@ export async function readCleanRaw(
 }
 
 // Read and sanity check one record file
-async function readRecord(dir: string, id: string): Promise<CleanRecord | undefined> {
+type StoredRecord = CleanRecordSummary & { mapLines?: unknown };
+async function readRecord(dir: string, id: string): Promise<StoredRecord | undefined> {
     try {
-        const record = JSON.parse(await readFile(Path.join(dir, id + RECORD_SUFFIX), 'utf8')) as CleanRecord;
-        if (record.id !== id || !Array.isArray(record.mapLines)) return undefined;
+        const record = JSON.parse(await readFile(Path.join(dir, id + RECORD_SUFFIX), 'utf8')) as StoredRecord;
+        if (record.id !== id) return undefined;
         return record;
     } catch {
         return undefined;

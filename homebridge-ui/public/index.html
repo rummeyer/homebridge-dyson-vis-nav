@@ -23,8 +23,7 @@
     .dy-clean small { opacity: .75; }
     .dy-map       { margin-top: 1rem; padding: .75rem; background: #000; border-radius: .375rem;
                     overflow-x: auto; }
-    .dy-map canvas, .dy-map img { display: block; margin: 0 auto; max-width: 100%; height: auto; }
-    .dy-views     { display: flex; justify-content: flex-end; margin-bottom: .75rem; }
+    .dy-map img   { display: block; margin: 0 auto; max-width: 100%; height: auto; }
     .dy-legend    { margin: .5rem 0 0; font-size: .75rem; color: #bbb; text-align: center; }
 </style>
 
@@ -90,18 +89,9 @@
         appears here shortly after it finishes. This needs the MyDyson account, because the
         map comes from Dyson's cloud.</div>
     <div id="dyCleanMap" class="dy-map dy-hidden">
-        <div class="dy-views">
-            <div class="btn-group btn-group-sm" role="group" aria-label="Map style">
-                <button type="button" class="btn btn-outline-light" id="dyViewImage">Image</button>
-                <button type="button" class="btn btn-outline-light" id="dyViewText">Terminal</button>
-            </div>
-        </div>
         <img id="dyCleanImage" alt="Map of the selected clean">
-        <canvas id="dyCleanCanvas"></canvas>
-        <div class="dy-legend" id="dyLegendImage">Brighter = more dust &middot; blue dot = dock
+        <div class="dy-legend">Brighter = more dust &middot; blue dot = dock
             &middot; yellow dot = fault &middot; white lines = room boundaries</div>
-        <div class="dy-legend" id="dyLegendText">Brighter = more dust &middot; &#9675; dock
-            &middot; &#8252; fault &middot; &#9642; room boundary</div>
     </div>
     <button type="button" class="btn btn-sm btn-danger mt-3" id="dyCleanReset">Reset data</button>
 </div>
@@ -257,92 +247,10 @@
 //
 // Homebridge always draws the schema-generated form below this page, so the
 // cleans cannot follow the settings; instead the tab hides the form and the
-// account box, giving the map the full width.
-//
-// The plugin renders each map as lines of text for a monospaced terminal, with
-// ANSI 256-colour escape codes. Drawing those on a canvas, a cell at a time,
-// keeps the block elements seamless and aligned, which HTML text in a browser
-// font cannot promise.
+// account box, giving the map the full width. The map itself is a PNG that the
+// UI server draws from the cloud data stored with each clean.
 (() => {
     const $ = id => document.getElementById(id);
-
-    // Character cell, in CSS pixels, with the 5:9 aspect the map assumes
-    const CELL_W = 7;
-    const CELL_H = CELL_W * 9 / 5;
-
-    // Quadrature block elements; the index is the set of quadrants filled
-    // (1 top left, 2 top right, 4 bottom left, 8 bottom right)
-    const QUADRANTS = ' \u2598\u259D\u2580\u2596\u258C\u259E\u259B\u2597\u259A\u2590\u259C\u2584\u2599\u259F\u2588';
-
-    // Convert an xterm 256-colour index to CSS
-    const xterm = n => {
-        const BASIC = ['#000', '#800000', '#008000', '#808000', '#000080', '#800080', '#008080', '#c0c0c0',
-                       '#808080', '#f00', '#0f0', '#ff0', '#00f', '#f0f', '#0ff', '#fff'];
-        if (n < 16) return BASIC[n];
-        if (n >= 232) { const v = 8 + (n - 232) * 10; return `rgb(${v},${v},${v})`; }
-        const level = i => i ? 55 + i * 40 : 0;
-        n -= 16;
-        return `rgb(${level(Math.floor(n / 36))},${level(Math.floor(n / 6) % 6)},${level(n % 6)})`;
-    };
-
-    // Split a line into cells of { char, fg, bg }
-    const parseLine = line => {
-        const cells = [];
-        let fg = '#ccc', bg = '#000';
-        for (const [, codes, char] of line.matchAll(/\u001B\[([0-9;]*)m|(.)/gsu)) {
-            if (char !== undefined) { cells.push({ char, fg, bg }); continue; }
-            const params = codes.split(';').map(Number);
-            for (let i = 0; i < params.length; ++i) {
-                const p = params[i];
-                if (p === 0)                              { fg = '#ccc'; bg = '#000'; }
-                else if (p === 39)                        fg = '#ccc';
-                else if (p === 49)                        bg = '#000';
-                else if ((p === 38 || p === 48) && params[i + 1] === 5) {
-                    const colour = xterm(params[i + 2]);
-                    if (p === 38) fg = colour; else bg = colour;
-                    i += 2;
-                }
-            }
-        }
-        return cells;
-    };
-
-    // Draw a map onto the canvas
-    const drawMap = lines => {
-        const rows = lines.map(parseLine);
-        const cols = Math.max(1, ...rows.map(r => r.length));
-        const dpr = window.devicePixelRatio || 1;
-        const canvas = $('dyCleanCanvas');
-        canvas.width  = Math.round(cols * CELL_W * dpr);
-        canvas.height = Math.round(rows.length * CELL_H * dpr);
-        canvas.style.width = `${cols * CELL_W}px`;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.font = `${Math.round(CELL_H * 0.8 * dpr)}px Menlo, Consolas, "DejaVu Sans Mono", monospace`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        // Snap to device pixels so neighbouring cells meet without seams
-        const x = c => Math.round(c * CELL_W * dpr);
-        const y = r => Math.round(r * CELL_H * dpr);
-        const fill = (colour, x0, y0, x1, y1) => { ctx.fillStyle = colour; ctx.fillRect(x0, y0, x1 - x0, y1 - y0); };
-        rows.forEach((cells, r) => cells.forEach(({ char, fg, bg }, c) => {
-            const [x0, xm, x1] = [x(c), x(c + 0.5), x(c + 1)];
-            const [y0, ym, y1] = [y(r), y(r + 0.5), y(r + 1)];
-            fill(bg, x0, y0, x1, y1);
-            const quadrants = QUADRANTS.indexOf(char);
-            if (0 < quadrants) {
-                if (quadrants & 1) fill(fg, x0, y0, xm, ym);
-                if (quadrants & 2) fill(fg, xm, y0, x1, ym);
-                if (quadrants & 4) fill(fg, x0, ym, xm, y1);
-                if (quadrants & 8) fill(fg, xm, ym, x1, y1);
-            } else if (quadrants < 0 && char.trim()) {
-                ctx.fillStyle = fg;
-                ctx.fillText(char, (x0 + x1) / 2, (y0 + y1) / 2);
-            }
-        }));
-    };
 
     // Describe a clean for the list
     const describe = clean => {
@@ -363,46 +271,15 @@
         return { title, facts: facts.join(' \u00B7 '), zones: (clean.zones ?? []).join(', ') };
     };
 
-    // Which view of the map to show, remembered in this browser only
-    let view = 'image';
-    try { view = localStorage.getItem('dyson-vis-nav:map-view') ?? view; } catch { /* default */ }
-    let hasImage = false;
-
-    // Show the chosen view; the text map stands in for a clean without an image
-    const showView = () => {
-        const image = view === 'image' && hasImage;
-        $('dyViewImage').classList.toggle('active', image);
-        $('dyViewText').classList.toggle('active', !image);
-        $('dyViewImage').disabled = !hasImage;
-        $('dyCleanImage').classList.toggle('dy-hidden', !image);
-        $('dyLegendImage').classList.toggle('dy-hidden', !image);
-        $('dyCleanCanvas').classList.toggle('dy-hidden', image);
-        $('dyLegendText').classList.toggle('dy-hidden', image);
-    };
-    const setView = chosen => {
-        view = chosen;
-        try { localStorage.setItem('dyson-vis-nav:map-view', view); } catch { /* not remembered */ }
-        showView();
-    };
-    $('dyViewImage').addEventListener('click', () => { setView('image'); });
-    $('dyViewText').addEventListener('click',  () => { setView('text'); });
-
     // Show the map of the selected clean
     let selecting = 0;
     const select = async (clean, button) => {
         for (const b of $('dyCleanList').children) b.classList.toggle('active', b === button);
         const current = ++selecting;
-        const which = { serialNumber: clean.serialNumber, id: clean.id };
         try {
-            const [record, image] = await Promise.all([
-                homebridge.request('/clean', which),
-                homebridge.request('/clean-image', which).catch(() => undefined)
-            ]);
+            const { png } = await homebridge.request('/clean-image', { serialNumber: clean.serialNumber, id: clean.id });
             if (current !== selecting) return;      // another clean was selected meanwhile
-            drawMap(record.mapLines);
-            hasImage = Boolean(image?.png);
-            if (hasImage) $('dyCleanImage').src = `data:image/png;base64,${image.png}`;
-            showView();
+            $('dyCleanImage').src = `data:image/png;base64,${png}`;
             $('dyCleanMap').classList.remove('dy-hidden');
         } catch (err) {
             $('dyCleanMap').classList.add('dy-hidden');
