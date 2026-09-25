@@ -181,6 +181,8 @@ Select a clean to see its map. It is drawn the way the Homebridge log shows it i
 
 **Where the maps come from.** When the robot finishes a clean, the plugin asks Dyson's cloud for the clean's map — the same data the MyDyson app shows — and stores it locally, so the list keeps working when the cloud does not answer. After you install or update the plugin, it fetches the most recent clean once, so the list does not start empty. The durations of cleans stored this way are unknown and left out.
 
+**Starting over.** **Reset data** below the map deletes every stored clean. Click it twice: the first click turns it into *SURE?*, and only a second click within five seconds deletes. The list then fills again from the next clean.
+
 **What it needs.** The MyDyson account from [Step 3](#step-3--connect-your-mydyson-account). Without it the plugin cannot reach the maps and the list stays empty.
 
 **Maps in the log as well.** Set **Clean Map Logging** to draw each map into the Homebridge log too. Pick *Homebridge* for the log viewer in the Homebridge UI, whose font would scramble the *Monospaced* style, and *Monospaced* for a terminal (`tail -f` over SSH). The map in the log appears shortly after the clean ends, once the plugin has fetched it.

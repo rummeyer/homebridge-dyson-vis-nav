@@ -11,6 +11,12 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+### Added
+
+- **Reset data on the Recent Cleans tab** deletes every stored clean. It asks
+  twice on the button itself, as *SURE?*, and the list starts again with the
+  next clean.
+
 ## [1.1.0] — 2026-09-25
 
 ### Added

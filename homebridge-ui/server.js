@@ -6,7 +6,7 @@ import NodePersist from 'node-persist';
 import Path from 'path';
 
 import { DysonCloudAuth } from '../dist/dyson-cloud.js';
-import { listCleanRecords, readCleanRecord } from '../dist/dyson-clean-history.js';
+import { deleteCleanRecords, listCleanRecords, readCleanRecord } from '../dist/dyson-clean-history.js';
 import { PLUGIN_NAME } from '../dist/settings.js';
 import { makeAuthConfig } from './auth-config.mjs';
 
@@ -25,6 +25,7 @@ class DysonUiServer extends HomebridgePluginUiServer {
         this.onRequest('/finish-auth',  request => this.finishAuth(request));
         this.onRequest('/cleans',       () => this.listCleans());
         this.onRequest('/clean',        request => this.readClean(request));
+        this.onRequest('/cleans/reset', () => this.resetCleans());
 
         this.ready();
     }
@@ -163,6 +164,12 @@ class DysonUiServer extends HomebridgePluginUiServer {
         const record = await readCleanRecord(this.homebridgeStoragePath, request?.serialNumber, request?.id);
         if (!record) throw new RequestError('That clean is no longer stored.');
         return record;
+    }
+
+    // Delete every stored clean; the plugin starts a new list with the next one
+    async resetCleans() {
+        await deleteCleanRecords(this.homebridgeStoragePath);
+        return {};
     }
 }
 

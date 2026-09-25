@@ -93,6 +93,7 @@
         <div class="dy-legend">Brighter = more dust &middot; &#9675; dock &middot; &#8252; fault
             &middot; &#9642; room boundary</div>
     </div>
+    <button type="button" class="btn btn-sm btn-primary mt-3" id="dyCleanReset">Reset data</button>
 </div>
 
 <script>
@@ -374,6 +375,7 @@
         const list = $('dyCleanList');
         list.replaceChildren();
         $('dyCleanNone').classList.toggle('dy-hidden', cleans.length > 0);
+        $('dyCleanReset').classList.toggle('dy-hidden', cleans.length === 0);
         for (const clean of cleans) {
             const { title, facts, zones } = describe(clean);
             const button = document.createElement('button');
@@ -398,6 +400,36 @@
         }
         if (cleans.length) void select(cleans[0], list.firstElementChild);
     };
+
+    // Delete every stored clean, after a second click.
+    //
+    // Asked twice on the button itself rather than with confirm(), which the
+    // host's iframe may not be allowed to show.
+    const reset = $('dyCleanReset');
+    let armed = null;
+    reset.addEventListener('click', () => {
+        if (!armed) {
+            reset.textContent = 'SURE?';
+            armed = setTimeout(() => { armed = null; reset.textContent = 'Reset data'; }, 5000);
+            return;
+        }
+        clearTimeout(armed);
+        armed = null;
+        reset.disabled = true;
+        void (async () => {
+            try {
+                await homebridge.request('/cleans/reset');
+                homebridge.toast.success('The next clean starts a new list.', 'Data reset');
+                $('dyCleanMap').classList.add('dy-hidden');
+                await load();
+            } catch (err) {
+                homebridge.toast.error(err.message, 'Reset failed');
+            } finally {
+                reset.disabled = false;
+                reset.textContent = 'Reset data';
+            }
+        })();
+    });
 
     // Switch between the settings and the cleans
     const showTab = cleansTab => {

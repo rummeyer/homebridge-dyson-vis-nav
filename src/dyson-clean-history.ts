@@ -96,6 +96,11 @@ export async function listCleanRecords(storagePath: string): Promise<CleanRecord
     return summaries.sort((a, b) => b.id.localeCompare(a.id));
 }
 
+// Delete every stored clean of every device
+export async function deleteCleanRecords(storagePath: string): Promise<void> {
+    await rm(cleanHistoryRoot(storagePath), { recursive: true, force: true });
+}
+
 // Read a single stored clean, including its map
 export async function readCleanRecord(
     storagePath:    string,
