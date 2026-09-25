@@ -11,6 +11,8 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-09-25
+
 ### Added
 
 - **Maps of your last 10 cleans, on a Recent Cleans tab in the plugin's
@@ -311,7 +313,8 @@ Verified end to end by replaying a recorded Vis Nav MQTT session: the accessory
 publishes as a standalone Matter node and all five clusters track the device
 through cleaning, docking, charging and fault states.
 
-[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.6...HEAD
+[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.6...v1.1.0
 [1.0.6]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.0.3...v1.0.4
