@@ -11,6 +11,13 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Cleans are stored again after the robot realigns its map.** A new
+  version of the map in the MyDyson app can place its rooms with an offset,
+  which the plugin rejected as an unexpected response from Dyson, so no clean
+  was stored and the settings page showed no new map.
+
 ## [1.4.2] — 2026-09-28
 
 ### Fixed

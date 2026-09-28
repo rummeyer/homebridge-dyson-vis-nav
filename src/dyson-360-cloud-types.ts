@@ -81,11 +81,6 @@ export interface Dyson360PersistentMapLocation {
 export interface Dyson360PersistentMapLocationRotated extends Dyson360PersistentMapLocation{
     angle:                              number;             // °
 }
-export interface Dyson360PersistentMapLocationIdentity {
-    x:                                  0;                  // mm
-    y:                                  0;                  // mm
-    angle:                              0;                  // °
-}
 export interface Dyson360PersistentMapBitmap {
     resolution:                         number;             // mm/pixel
     data:                               string;             // base64 encoded PNG image
@@ -103,7 +98,7 @@ export interface Dyson360PersistentMapZonesDefinition {
     persistentMapDisplayOrientation:    Dyson360Rotation;
     persistentMapId:                    string;             // UUID
     persistentMapName:                  string;             // e.g. 'Downstairs'
-    persistentMapOffset:                Dyson360PersistentMapLocationIdentity;
+    persistentMapOffset:                Dyson360PersistentMapLocationRotated; // (angle only seen as 0)
     persistentMapVersion:               number;             // e.g. 1
     thresholds:                         Dyson360PersistentMapThreshold[];
     zoneProperties:                     Dyson360PersistentMapMetadataZoneProperties[],
@@ -128,7 +123,7 @@ export interface Dyson360PersistentMapRestriction {
 export interface Dyson360PersistentMapRestrictionsDefinition {
     lastUpdatedDate:                    string;             // e.g. '2025-12-17T11:30:52.6166355Z'
     persistentMapId:                    string;             // UUID
-    persistentMapOffset:                Dyson360PersistentMapLocationIdentity;
+    persistentMapOffset:                Dyson360PersistentMapLocationRotated; // (angle only seen as 0)
     persistentMapVersion:               number;             // e.g. 3
     restrictions:                       Dyson360PersistentMapRestriction[];
 }
