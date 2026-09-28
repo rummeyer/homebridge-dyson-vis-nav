@@ -11,6 +11,8 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+## [1.4.2] — 2026-09-28
+
 ### Fixed
 
 - **The map of a clean is no longer lost when the robot takes a while to get
@@ -404,7 +406,8 @@ Verified end to end by replaying a recorded Vis Nav MQTT session: the accessory
 publishes as a standalone Matter node and all five clusters track the device
 through cleaning, docking, charging and fault states.
 
-[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.2...HEAD
+[1.4.2]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.3.0...v1.3.1
