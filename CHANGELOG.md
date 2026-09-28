@@ -11,6 +11,12 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Leaving the settings page while a clean map is being drawn no longer
+  logs a crash.** The page's server process printed an unhandled `EPIPE`
+  error to the Homebridge log; nothing was lost, and it now exits quietly.
+
 ## [1.4.0] — 2026-09-25
 
 ### Added

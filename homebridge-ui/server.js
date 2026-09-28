@@ -201,5 +201,14 @@ function describeError(err) {
     return parts.join(' — ');
 }
 
+// Leaving the settings page closes the config UI's end of the channel, and it
+// may be left while an image is still being drawn. The response then has
+// nowhere to go, which Node reports as an unhandled 'error' event on the
+// process: a crash in the Homebridge log although nothing was lost.
+process.on('error', err => {
+    if (err.code === 'EPIPE' || err.code === 'ERR_IPC_CHANNEL_CLOSED') process.exit(0);
+    throw err;
+});
+
 // Start the server
 (() => new DysonUiServer())();
