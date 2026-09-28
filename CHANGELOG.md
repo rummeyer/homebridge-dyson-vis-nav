@@ -11,6 +11,8 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+## [1.4.1] — 2026-09-28
+
 ### Fixed
 
 - **Leaving the settings page while a clean map is being drawn no longer
@@ -392,7 +394,8 @@ Verified end to end by replaying a recorded Vis Nav MQTT session: the accessory
 publishes as a standalone Matter node and all five clusters track the device
 through cleaning, docking, charging and fault states.
 
-[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.2.0...v1.3.0
