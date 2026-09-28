@@ -11,6 +11,8 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+## [1.4.4] — 2026-09-28
+
 ### Fixed
 
 - **A clean of selected rooms lists only those rooms.** At the end of a zone
@@ -423,7 +425,8 @@ Verified end to end by replaying a recorded Vis Nav MQTT session: the accessory
 publishes as a standalone Matter node and all five clusters track the device
 through cleaning, docking, charging and fault states.
 
-[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.3...HEAD
+[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.4...HEAD
+[1.4.4]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.3...v1.4.4
 [1.4.3]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.0...v1.4.1
