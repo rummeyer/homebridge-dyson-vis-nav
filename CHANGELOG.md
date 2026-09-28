@@ -11,6 +11,16 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The map of a clean is no longer lost when the robot takes a while to get
+  home.** A clean ends while the robot is still away from its dock, and Dyson
+  has its map only after it has docked; the plugin gave up asking after
+  2½ minutes, a second before the map would have been there. It now keeps
+  asking for up to 30 minutes.
+- **A restart picks up a missed clean.** The most recent clean is stored
+  when it is not stored yet, not only when no clean is stored at all.
+
 ## [1.4.1] — 2026-09-28
 
 ### Fixed

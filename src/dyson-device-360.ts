@@ -48,19 +48,21 @@ export class DysonDevice360VisNav extends DysonDevice360ZonesMixin(DysonDevice36
         void this.seedCleanHistory();
     }
 
-    // Store the most recent clean if none is stored yet, so the settings page
-    // has a map to show straight after installation instead of after the next clean
+    // Store the most recent clean if it is not stored yet, so the settings page
+    // has a map to show straight after installation instead of after the next
+    // clean, and a clean whose retrieval failed is picked up on a restart
     async seedCleanHistory(): Promise<void> {
         try {
             if (!this.api) return;
-            const stored = await listCleanRecords(this.hbApi.user.storagePath());
-            if (stored.some(record => record.serialNumber === this.serialNumber)) return;
             const finished = (await this.api.getCleanMaps360())
                 .filter(clean => clean.cleanTimeline.at(-1)?.eventName === Dyson360TimelineEvent.RunEnded)
                 .map(clean => ({ cleanId: clean.cleanId, time: clean.cleanTimeline.at(-1)?.time ?? '' }))
                 .sort((a, b) => b.time.localeCompare(a.time));
             const latest = finished[0];
             if (!latest) return;
+            const stored = await listCleanRecords(this.hbApi.user.storagePath());
+            if (stored.some(record => record.serialNumber === this.serialNumber
+                                   && record.cleanId      === latest.cleanId)) return;
             const result = await this.getCompletedClean(latest.cleanId);
             if (typeof result === 'string') return;
             const { status } = this.mqtt;

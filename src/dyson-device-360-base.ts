@@ -66,9 +66,13 @@ export type Dyson360CleanSummaryUnavailable =
   | 'Unavailable';  // No MyDyson API
 export type Dyson360CleanSummaryResult = Dyson360CleanSummary | Dyson360CleanSummaryUnavailable;
 
-// Retry configuration for retrieving details of a completed clean
-const CLEAN_RETRY_AFTER     =      5 * MS;  // 5 second minimum backoff
-const CLEAN_RETRY_LIMIT     = 5 * 60 * MS;  // Give up after 1 minute
+// Retry configuration for retrieving details of a completed clean. A clean
+// ends while the robot is still away from its dock, and the cloud has the
+// clean only after it has driven back and uploaded it; that took 2½ minutes
+// from the far end of a flat, so the limit leaves room for a longer way home.
+const CLEAN_RETRY_AFTER     =       5 * MS; // 5 second minimum backoff
+const CLEAN_RETRY_MAX       =  2 * 60 * MS; // At most 2 minutes between attempts
+const CLEAN_RETRY_LIMIT     = 30 * 60 * MS; // Give up after 30 minutes
 const CLEAN_RETRY_FACTOR    = 2;            // Double backoff on each failure
 
 // Mapping of robot vacuum state to Matter equivalents
@@ -274,17 +278,20 @@ export abstract class DysonDevice360Base
             const result = await this.getCompletedClean(cleanId);
             switch (result) {
             case 'Not found':
-            case 'Not ready':
-                // Failure might be due to requesting the results too soon
-                if (giveUpAt < Date.now() + backoff) {
+            case 'Not ready': {
+                // Failure might be due to requesting the results too soon;
+                // the last attempt is made at the limit rather than skipped
+                const remaining = giveUpAt - Date.now();
+                if (remaining <= 0) {
                     this.log.warn(`Abandoned retrieval of clean ${cleanId}: ${result}`);
                     return {};
-                } else {
-                    this.log.debug(`Failed to retrieve clean ${cleanId}: ${result}; retrying in ${formatMilliseconds(backoff)}...`);
-                    await setTimeout(backoff);
-                    backoff *= CLEAN_RETRY_FACTOR;
                 }
+                const wait = Math.min(backoff, remaining);
+                this.log.debug(`Failed to retrieve clean ${cleanId}: ${result}; retrying in ${formatMilliseconds(wait)}...`);
+                await setTimeout(wait);
+                backoff = Math.min(backoff * CLEAN_RETRY_FACTOR, CLEAN_RETRY_MAX);
                 break;
+            }
             case 'Unavailable':
                 // Not using MyDyson API
                 return {};
