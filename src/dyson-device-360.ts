@@ -19,6 +19,7 @@ import { dysonRenderMap360VisNav } from './dyson-device-360-map.js';
 import { Dyson360PersistentMapResponse } from './dyson-360-cloud-types.js';
 import { listCleanRecords } from './dyson-clean-history.js';
 import { logError } from './log-error.js';
+import { tryListener } from './utils.js';
 
 // A Dyson 360 Vis Nav device
 export class DysonDevice360VisNav extends DysonDevice360ZonesMixin(DysonDevice360Base) {
@@ -42,10 +43,31 @@ export class DysonDevice360VisNav extends DysonDevice360ZonesMixin(DysonDevice36
     override getPowerLevel = () => this.mqtt.status.defaultCleaningStrategy;
     override getCurrentPowerLevel = () => this.mqtt.status.currentCleaningStrategy;
 
+    // The zones a zone clean was asked to clean. At its end the robot reports
+    // every zone as complete, asked for or not, and the cloud keeps no record
+    // of the selection, so it is noted from the status while the clean runs.
+    selectedZones?: { cleanId: string, zones: Set<string> };
+    readonly selectedZonesListener = tryListener(this.mqtt, () => {
+        const { cleanId, cleaningProgramme } = this.mqtt.status;
+        const zones = new Set([
+            ...(cleaningProgramme?.orderedZones   ?? []),
+            ...(cleaningProgramme?.unorderedZones ?? [])
+        ]);
+        if (cleanId && zones.size) this.selectedZones = { cleanId, zones };
+    });
+
     // Start the device after the accessory has been registered
     override async start(): Promise<void> {
+        this.mqtt.on('status', this.selectedZonesListener);
+        this.selectedZonesListener();   // (a clean may be running already)
         await super.start();
         void this.seedCleanHistory();
+    }
+
+    // Stop the device when Homebridge is shutting down
+    override async stop(): Promise<void> {
+        this.mqtt.off('status', this.selectedZonesListener);
+        await super.stop();
     }
 
     // Store the most recent clean if it is not stored yet, so the settings page
@@ -94,11 +116,14 @@ export class DysonDevice360VisNav extends DysonDevice360ZonesMixin(DysonDevice36
         if (logMapStyle === 'Off') delete summary.mapLines;
 
         // Names of the zones cleaned, in the order first entered. The timeline
-        // alone would also list rooms the robot only drove through.
+        // alone would also list rooms the robot only drove through, and the
+        // zone status alone every room of a zone clean.
         const zoneNames = new Map(persistentMap?.zonesDefinition.zones.map(zone => [zone.id, zone.name]));
+        const selected = this.selectedZones?.cleanId === cleanId ? this.selectedZones.zones : undefined;
         const cleaned = new Set((clean.zoneStatus ?? [])
             .filter(({ cleanStatus }) => cleanStatus === Dyson360ZoneCleanStatus.Complete)
-            .map(({ zoneId }) => zoneId));
+            .map(({ zoneId }) => zoneId)
+            .filter(zoneId => selected?.has(zoneId) ?? true));
         const entered = clean.cleanTimeline.flatMap(({ zone }) => zone === null ? [] : [zone]);
         const zones = [...new Set([...entered, ...cleaned])]
             .filter(zone => cleaned.has(zone))

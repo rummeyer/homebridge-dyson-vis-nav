@@ -11,6 +11,14 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A clean of selected rooms lists only those rooms.** At the end of a zone
+  clean the robot reports every room as complete, so the Recent Cleans tab
+  listed rooms it had only driven into. The rooms asked for are now noted
+  while the clean runs. A clean picked up only after a restart still lists
+  every room the robot reported, since the selection is not kept by Dyson.
+
 ## [1.4.3] — 2026-09-28
 
 ### Fixed
