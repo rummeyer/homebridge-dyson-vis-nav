@@ -564,6 +564,13 @@ function snapRoomEdges(rects: RoomRect[], snap: number): void {
             const ats = merged.map(({ at }) => at);
             if (snap < Math.max(...ats) - Math.min(...ats)) continue;
             if (new Set(merged.map(({ rect }) => rect)).size < merged.length) continue;
+            // (facing edges are the two sides of one wall only if their rooms
+            // at most slightly overlap: a room drawn as one rectangle despite
+            // an L shape reaches well past the room beside it, whose wall would
+            // be pulled into the middle of it)
+            const lowestLo = Math.min(...merged.filter(({ side }) => side === lo).map(({ at }) => at));
+            const highestHi = Math.max(...merged.filter(({ side }) => side === hi).map(({ at }) => at));
+            if (snap / 2 < highestHi - lowestLo) continue;
             for (const edge of merged) groupOf[edges.indexOf(edge)] = merged;
         }
 

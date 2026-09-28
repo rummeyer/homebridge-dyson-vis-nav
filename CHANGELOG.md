@@ -11,6 +11,15 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A room beside an L-shaped room keeps its size in the floor plan.** The
+  floor plan draws an L-shaped room such as a hallway as one rectangle, and
+  lining up the walls could pull the wall of a room beside it into that
+  rectangle, drawing the room smaller than it is. Whether it did depended on
+  centimetres of difference between cleans, so a room could change size from
+  one clean to the next.
+
 ## [1.4.4] — 2026-09-28
 
 ### Fixed
