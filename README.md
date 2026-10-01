@@ -171,7 +171,10 @@ Open the plugin's settings in Homebridge and switch to the **Recent Cleans** tab
 Select a clean to see its map, drawn at full resolution — one pixel for every 2 cm of floor — with the rooms you set up in the MyDyson app, each in its own colour and with its name:
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/rummeyer/homebridge-dyson-vis-nav/main/assets/clean-map.png" width="576" alt="Floor plan of a flat with eight named rooms; the hallway and living room are coloured by how much dust the robot picked up">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/rummeyer/homebridge-dyson-vis-nav/main/assets/screenshots/recent-cleans-dark.png">
+    <img src="https://raw.githubusercontent.com/rummeyer/homebridge-dyson-vis-nav/main/assets/screenshots/recent-cleans-light.png" width="760" alt="The Recent Cleans tab: the last five cleans with date, area and rooms, and below them the map of the selected one — a flat with eight named rooms, the living room, hallway and first bedroom coloured by how much dust the robot picked up">
+  </picture>
 </p>
 
 | On the map | Means |
