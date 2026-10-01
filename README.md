@@ -211,6 +211,10 @@ The floor plan assumes straight walls at right angles. Sloping walls and bay win
 
 Everything below has a sensible default; you can ignore all of it.
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/rummeyer/homebridge-dyson-vis-nav/main/assets/screenshots/settings.png" width="520" alt="The settings page in the Homebridge UI: the MyDyson account box with an authorised account, and the plugin's own settings: the name, a serial-number allow list, and the advanced options">
+</p>
+
 | Setting | Default | What it does |
 |---|---|---|
 | **Name** | Dyson 360 Vis Nav | The name shown in the Homebridge log |
