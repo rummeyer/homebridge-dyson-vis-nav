@@ -11,6 +11,8 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+## [1.4.7] — 2026-10-05
+
 ### Changed
 
 - **Clean maps show the rooms as mapped by default**, with the switch above
@@ -449,7 +451,8 @@ Verified end to end by replaying a recorded Vis Nav MQTT session: the accessory
 publishes as a standalone Matter node and all five clusters track the device
 through cleaning, docking, charging and fault states.
 
-[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.6...HEAD
+[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.7...HEAD
+[1.4.7]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.6...v1.4.7
 [1.4.6]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.5...v1.4.6
 [1.4.5]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.4...v1.4.5
 [1.4.4]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.3...v1.4.4
