@@ -11,6 +11,12 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+### Changed
+
+- **Clean maps show the rooms as mapped by default**, with the switch above
+  the map now reading *As mapped* | *Floor plan*. The floor plan is one click
+  away, and a browser that already chose a style keeps it.
+
 ## [1.4.6] — 2026-10-01
 
 ### Changed

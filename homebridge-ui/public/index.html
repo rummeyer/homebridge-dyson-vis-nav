@@ -96,18 +96,18 @@
     <div id="dyCleanMap" class="dy-map dy-hidden">
         <div class="dy-views">
             <div class="btn-group btn-group-sm" role="group" aria-label="Map style">
-                <button type="button" class="btn btn-outline-light" id="dyViewPlan">Floor plan</button>
                 <button type="button" class="btn btn-outline-light" id="dyViewMapped">As mapped</button>
+                <button type="button" class="btn btn-outline-light" id="dyViewPlan">Floor plan</button>
             </div>
         </div>
         <div class="dy-map-frame" id="dyCleanFrame">
             <img id="dyCleanImage" alt="Map of the selected clean">
         </div>
-        <div class="dy-legend" id="dyLegendPlan">Brighter = more dust &middot; blue dot = dock
-            &middot; yellow dot = fault &middot; rooms squared off, without the furniture</div>
         <div class="dy-legend" id="dyLegendMapped">Brighter = more dust &middot; blue dot = dock
             &middot; yellow dot = fault &middot; white lines = walls and furniture
             &middot; grey lines = room dividers</div>
+        <div class="dy-legend" id="dyLegendPlan">Brighter = more dust &middot; blue dot = dock
+            &middot; yellow dot = fault &middot; rooms squared off, without the furniture</div>
     </div>
     <button type="button" class="btn btn-sm btn-danger mt-3" id="dyCleanReset">Reset data</button>
 </div>
@@ -287,13 +287,13 @@
         return { title, facts: facts.join(' \u00B7 '), zones: (clean.zones ?? []).join(', ') };
     };
 
-    // Map style: rooms squared off into a floor plan, or as the robot mapped
-    // them; remembered in this browser only (storage may be unavailable)
+    // Map style: rooms as the robot mapped them, or squared off into a floor
+    // plan; remembered in this browser only (storage may be unavailable)
     const STYLE_KEY = 'dyson-vis-nav-map-style';
-    let floorPlan = true;
-    try { floorPlan = localStorage.getItem(STYLE_KEY) !== 'mapped'; } catch { /* default */ }
+    let floorPlan = false;
+    try { floorPlan = localStorage.getItem(STYLE_KEY) === 'plan'; } catch { /* default */ }
     const showStyle = () => {
-        for (const [id, active] of [['dyViewPlan', floorPlan], ['dyViewMapped', !floorPlan]]) {
+        for (const [id, active] of [['dyViewMapped', !floorPlan], ['dyViewPlan', floorPlan]]) {
             $(id).classList.toggle('active', active);
             $(id).setAttribute('aria-pressed', String(active));
         }
@@ -342,8 +342,8 @@
         const active = [...$('dyCleanList').children].find(b => b.classList.contains('active'));
         if (shown) void select(shown, active);
     };
-    $('dyViewPlan').addEventListener('click', () => setStyle(true));
     $('dyViewMapped').addEventListener('click', () => setStyle(false));
+    $('dyViewPlan').addEventListener('click', () => setStyle(true));
 
     // Load the list of stored cleans
     const load = async () => {

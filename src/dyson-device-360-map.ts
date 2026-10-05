@@ -305,7 +305,7 @@ export function dysonRenderImage360VisNav(
     log:        AnsiLogger,
     clean:      Dyson360CleanMap,
     map?:       Dyson360PersistentMapResponse,
-    floorPlan = true
+    floorPlan = false
 ): Dyson360MapImage {
     const { renderer, mmPerPixel, dustScale } = prepareMap360VisNav(log, clean, map);
     renderer.charAspectRatio = 1;
