@@ -8,8 +8,8 @@ import { assertIsDefined } from './utils.js';
 import { DysonAnsiChar, DysonBitmapAnsi } from './dyson-bitmap-ansi.js';
 import {
     Dyson360CleanHistoryEntry,
-    Dyson360CleanMap,
-    Dyson360PersistentMapResponse
+    Dyson360CleanMapV1,
+    Dyson360PersistentMapResponseV1
 } from './dyson-360-cloud-types.js';
 import { inflateSync } from 'zlib';
 import { PNG } from 'pngjs';
@@ -117,8 +117,8 @@ export function dysonRenderMap360Eye(
 // match the app; shared by the log's text map and the settings page's image
 function prepareMap360VisNav(
     log:    AnsiLogger,
-    clean:  Dyson360CleanMap,
-    map?:   Dyson360PersistentMapResponse
+    clean:  Dyson360CleanMapV1,
+    map?:   Dyson360PersistentMapResponseV1
 ) {
     // Check that the bitmaps are all the same resolution
     const resolutions = new Set<number>([
@@ -142,7 +142,7 @@ function prepareMap360VisNav(
     };
 
     // If the clean is associated with a map then parse its presentation map
-    let presentationBitmap: DysonBitmapOctet;
+    let presentationBitmap: DysonBitmapOctet<Dyson360VisNavPresentationOctet>;
     let presentationOrigin: { x: number, y: number } | undefined;
     let zonesBitmap:        DysonBitmapOctet;
     let zonesOrigin:        { x: number, y: number } | undefined;
@@ -212,8 +212,8 @@ function prepareMap360VisNav(
 export function dysonRenderMap360VisNav(
     log:    AnsiLogger,
     style:  Dyson360MapStyle,
-    clean:  Dyson360CleanMap,
-    map?:   Dyson360PersistentMapResponse
+    clean:  Dyson360CleanMapV1,
+    map?:   Dyson360PersistentMapResponseV1
 ): Dyson360CleanSummary {
     // Scale all the images to target log width
     const { renderer, mmPerPixel, cleanedBitmap, dustScale } = prepareMap360VisNav(log, clean, map);
@@ -232,7 +232,7 @@ export function dysonRenderMap360VisNav(
                 [Dyson360VisNavPresentationOctet.Boundary]: makeGlyph(style, 'boundary'),
                 [Dyson360VisNavPresentationOctet.Empty]:    makeGlyph(style, 'empty')
             };
-            const presentationOctet: Dyson360VisNavPresentationOctet = Math.max(...presentation);
+            const presentationOctet = presentation.reduce((a, b) => (a < b ? b : a));
             const presentationChar = PRESENTATION_ANSI_BG[presentationOctet];
 
             // Faults take priority over everything else
@@ -303,8 +303,8 @@ export interface Dyson360MapImage {
 // names are returned rather than drawn so that the page can set them as text.
 export function dysonRenderImage360VisNav(
     log:        AnsiLogger,
-    clean:      Dyson360CleanMap,
-    map?:       Dyson360PersistentMapResponse,
+    clean:      Dyson360CleanMapV1,
+    map?:       Dyson360PersistentMapResponseV1,
     floorPlan = false
 ): Dyson360MapImage {
     const { renderer, mmPerPixel, dustScale } = prepareMap360VisNav(log, clean, map);
@@ -312,8 +312,7 @@ export function dysonRenderImage360VisNav(
     const { width, height, readPixels } = renderer.prepareBitmaps(1);
 
     // Read every pixel once
-    const pixels = Array.from({ length: width * height }, (_, i) => readPixels(i % width, Math.floor(i / width)) as
-        [Dyson360VisNavCleanedOctet, Dyson360VisNavPresentationOctet, number, number]);
+    const pixels = Array.from({ length: width * height }, (_, i) => readPixels(i % width, Math.floor(i / width)));
 
     // The rooms either as mapped, or as a floor plan: furniture leaves the
     // mapped rooms ragged, so each is squared off into a rectangle (or a few

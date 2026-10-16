@@ -409,10 +409,8 @@ export class MatterAccessory360 extends DysonAccessory360 {
                 if (!supportedArea) throw new SelectAreaError.UnsupportedArea(`${area} is not a supported area`);
                 maps.add(supportedArea.mapId);
             }
-
-            // If all areas are specified then treat it as an empty list
-            if (newAreas.length === supportedAreas.length) newAreas = [];
-            else if (maps.size !== 1) throw new SelectAreaError.InvalidSet('Areas must all be from the same map');
+            // An empty list (clean everywhere) has no map; any other must have one
+            if (1 < maps.size) throw new SelectAreaError.InvalidSet('Areas must all be from the same map');
 
             // Attempt to select the areas
             await this.executeCommand('SelectAreas', newAreas);

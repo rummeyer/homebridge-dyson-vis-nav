@@ -1,8 +1,8 @@
 {
     "repository": "https://github.com/thoukydides/matterbridge-dyson-robot.git",
     "baseline": {
-        "ref": "v1.11.1",
-        "commit": "8871092476de5ee5ec733a320d70b751b08b95c4"
+        "ref": "v1.12.3",
+        "commit": "0e7decbe97b2e7c6861003a47728bf1898a24b97"
     },
     "comment": [
         "The Dyson protocol layer is carried over from matterbridge-dyson-robot",
@@ -49,6 +49,7 @@
         "dyson-device-base.ts",
         "dyson-device-compatibility.ts",
         "dyson-device.ts",
+        "dyson-locales.ts",
         "dyson-mqtt-360.ts",
         "dyson-mqtt-cache.ts",
         "dyson-mqtt-client-base.ts",
@@ -63,7 +64,6 @@
         "error-360.ts",
         "log-error.ts",
         "logger-options.ts",
-        "periodic.ts",
         "utils.ts"
     ],
     "notPorted": {
@@ -72,6 +72,13 @@
             "dyson-air-*.ts",
             "dyson-device-air*.ts",
             "dyson-mqtt-air.ts",
+            "dyson-360-jdm-*.ts",
+            "dyson-mqtt-360-jdm.ts",
+            "dyson-device-360-jdm.ts",
+            "dyson-device-360-mop.ts",
+            "dyson-cloud-scrape.ts",
+            "periodic-op.ts",
+            "simple-poll.ts",
             "endpoint-*.ts",
             "platform.ts",
             "index.ts",

@@ -147,9 +147,8 @@ export class PlatformDyson implements DynamicPlatformPlugin {
             }
 
             // Create the device instance
-            const deviceApi = 'api' in deviceConfig ? deviceConfig.api : undefined;
             const device = await createDysonDevice(
-                deviceLog, this.config, this.api, this.persist, deviceConfig, deviceApi);
+                deviceLog, this.config, this.api, this.persist, deviceConfig);
 
             // Register the accessory with Homebridge
             const accessory = device.getAccessory();

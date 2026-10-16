@@ -11,6 +11,26 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Selecting no rooms starts a whole-home clean** instead of being rejected.
+  Selecting every room now cleans those rooms as a zone clean rather than
+  switching to a whole-home clean.
+- **Room progress stays visible after a clean**. Finished rooms stay marked as
+  completed, and rooms the clean never reached show as skipped, instead of the
+  progress being cleared once the robot stopped.
+- **Rooms follow edits made in the MyDyson app** as soon as the robot reports
+  its map changed, not only when the next zone clean is requested.
+
+### Changed
+
+- **The Dyson protocol layer is updated to matterbridge-dyson-robot 1.12.3.**
+  It brings more robust retries of failed MyDyson requests (including Cloudflare
+  errors and rate limits) and new robot fault codes.
+- **Per-device MyDyson requests use the device's own market** for their country
+  and language. The country setting still chooses between the mainland China
+  and global servers.
+
 ## [1.4.7] — 2026-10-05
 
 ### Changed

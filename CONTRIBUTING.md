@@ -63,9 +63,17 @@ enumerated attribute as a plain `number`, so nothing more is needed.
 
 - **Scope**: air treatment devices and the three local provisioning methods are
   dropped. The Vis Nav accepts only cloud connections.
-- **`reportedPowerLevel`** in `dyson-device-360-base.ts` reports the *running*
-  cleaning strategy during a clean rather than the configured default, because a
-  Vis Nav zone can carry its own strategy. Upstream reports the default.
+- **`mapCleanMode`** in `dyson-device-360-base.ts` reports the *running*
+  cleaning strategy during a clean, because a Vis Nav zone can carry its own
+  strategy, and the configured default otherwise, because that is what the next
+  clean uses and what a mode change writes. Upstream reports the running
+  strategy at all times.
+- **The account's country** only chooses the API host: `dyson-cloud.ts` turns it
+  into upstream's `china` flag. The country and locale that per-device endpoints
+  ask for come from each device's market in the manifest, as upstream does.
+- **`override` modifiers** are added where upstream omits them, because this
+  project compiles with `noImplicitOverride`. That alone makes
+  `dyson-cloud-error.ts` diverge.
 - **Unreachable handling**: upstream writes `reachable` on the node's Basic
   Information cluster. Homebridge's plugin API cannot address the node, only the
   device endpoint, so that write fails with *"Behavior basicInformation is not

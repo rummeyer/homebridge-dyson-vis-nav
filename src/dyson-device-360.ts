@@ -5,7 +5,8 @@
 import { BasicInformation } from './matter-clusters.js';
 import { RvcCleanMode360 } from './matter-360-modes.js';
 import {
-    Dyson360CleaningStrategy,
+    Dyson360CleaningMode,
+    Dyson360VacuumMode,
     Dyson360TimelineEvent,
     Dyson360ZoneCleanStatus
 } from './dyson-360-types.js';
@@ -14,12 +15,17 @@ import {
     Dyson360PowerLevelMap,
     Dyson360CleanSummaryResult
 } from './dyson-device-360-base.js';
-import { DysonDevice360ZonesMixin } from './dyson-device-360-zones.js';
+import { Dyson360CleaningStatus, DysonDevice360ZonesMixin } from './dyson-device-360-zones.js';
 import { dysonRenderMap360VisNav } from './dyson-device-360-map.js';
-import { Dyson360PersistentMapResponse } from './dyson-360-cloud-types.js';
+import {
+    Dyson360PersistentMapMetadataResponseV1,
+    Dyson360PersistentMapResponseV1
+} from './dyson-360-cloud-types.js';
+import { DysonMqttStatus360 } from './dyson-mqtt-360.js';
+import { DysonMqttStatus } from './dyson-mqtt.js';
 import { listCleanRecords } from './dyson-clean-history.js';
 import { logError } from './log-error.js';
-import { tryListener } from './utils.js';
+import { assertIsDefined, tryListener } from './utils.js';
 
 // A Dyson 360 Vis Nav device
 export class DysonDevice360VisNav extends DysonDevice360ZonesMixin(DysonDevice360Base) {
@@ -33,14 +39,14 @@ export class DysonDevice360VisNav extends DysonDevice360ZonesMixin(DysonDevice36
     });
 
     override getPowerLevelMaps = (): Dyson360PowerLevelMap[] => [
-        [Dyson360CleaningStrategy.Auto,     RvcCleanMode360.Auto,       'Auto'],
-        [Dyson360CleaningStrategy.Quick,    RvcCleanMode360.Quick,      'Quick'],
-        [Dyson360CleaningStrategy.Quiet,    RvcCleanMode360.Quiet,      'Quiet'],
-        [Dyson360CleaningStrategy.Boost,    RvcCleanMode360.MaxBoost,   'Boost']
+        [Dyson360VacuumMode.Auto,     RvcCleanMode360.Auto,       'Auto'],
+        [Dyson360VacuumMode.Quick,    RvcCleanMode360.Quick,      'Quick'],
+        [Dyson360VacuumMode.Quiet,    RvcCleanMode360.Quiet,      'Quiet'],
+        [Dyson360VacuumMode.Boost,    RvcCleanMode360.MaxBoost,   'Boost']
     ];
 
-    override setPowerLevel = (powerLevel: Dyson360CleaningStrategy) => this.mqtt.commandSetCleaningStrategy(powerLevel);
-    override getPowerLevel = () => this.mqtt.status.defaultCleaningStrategy;
+    override setPowerLevel = (powerLevel: Dyson360VacuumMode) => this.mqtt.commandSetCleaningStrategy(powerLevel);
+    override getDefaultPowerLevel = () => this.mqtt.status.defaultCleaningStrategy;
     override getCurrentPowerLevel = () => this.mqtt.status.currentCleaningStrategy;
 
     // The zones a zone clean was asked to clean. At its end the robot reports
@@ -49,9 +55,10 @@ export class DysonDevice360VisNav extends DysonDevice360ZonesMixin(DysonDevice36
     selectedZones?: { cleanId: string, zones: Set<string> };
     readonly selectedZonesListener = tryListener(this.mqtt, () => {
         const { cleanId, cleaningProgramme } = this.mqtt.status;
+        if (!cleaningProgramme || !('unorderedZones' in cleaningProgramme)) return;
         const zones = new Set([
-            ...(cleaningProgramme?.orderedZones   ?? []),
-            ...(cleaningProgramme?.unorderedZones ?? [])
+            ...(cleaningProgramme.orderedZones ?? []),
+            ...cleaningProgramme.unorderedZones
         ]);
         if (cleanId && zones.size) this.selectedZones = { cleanId, zones };
     });
@@ -76,7 +83,7 @@ export class DysonDevice360VisNav extends DysonDevice360ZonesMixin(DysonDevice36
     async seedCleanHistory(): Promise<void> {
         try {
             if (!this.api) return;
-            const finished = (await this.api.getCleanMaps360())
+            const finished = (await this.api.getCleanMaps360V1())
                 .filter(clean => clean.cleanTimeline.at(-1)?.eventName === Dyson360TimelineEvent.RunEnded)
                 .map(clean => ({ cleanId: clean.cleanId, time: clean.cleanTimeline.at(-1)?.time ?? '' }))
                 .sort((a, b) => b.time.localeCompare(a.time));
@@ -96,18 +103,59 @@ export class DysonDevice360VisNav extends DysonDevice360ZonesMixin(DysonDevice36
         }
     }
 
+    // Update cluster attributes when the MQTT status is updated
+    override async updateClusterAttributes(
+        status: DysonMqttStatus<DysonMqttStatus360>
+    ): Promise<void> {
+        await super.updateClusterAttributes(status);
+
+        // Update the Service Area cluster when the zone status changes
+        const { currentCleaningMode: cleaningMode, cleaningProgramme, state, zoneStatus } = status;
+        let cleaningStatus: Dyson360CleaningStatus | undefined;
+        if (state.startsWith('FULL_CLEAN_')) {
+            assertIsDefined(cleaningMode);
+            if (cleaningMode === Dyson360CleaningMode.Global) {
+                // No map or zone for global cleans
+                cleaningStatus = { cleaningMode };
+            } else if (zoneStatus) {
+                // Live zone status available
+                const { persistentMapId: mapId, zonesDefinitionVersion: mapVersion } = status;
+                assertIsDefined(mapId);
+                cleaningStatus = { cleaningMode, mapId, mapVersion, zoneStatus };
+            } else if (cleaningProgramme && 'orderedZones' in cleaningProgramme) {
+                // No live zone status, so synthesise from cleaning programme
+                const zones = new Set([
+                    ...cleaningProgramme.unorderedZones,
+                    ...(cleaningProgramme.orderedZones ?? [])
+                ]);
+                cleaningStatus = {
+                    cleaningMode,
+                    mapId:      cleaningProgramme.persistentMapId,
+                    mapVersion: cleaningProgramme.zonesDefinitionLastUpdatedDate ?? undefined,
+                    zoneStatus: [...zones].map(zoneId => ({ zoneId, cleanStatus: Dyson360ZoneCleanStatus.Pending }))
+                };
+            }
+        }
+        await this.updateZoneStatus(cleaningStatus);
+    }
+
+    // Retrieve the latest persistent map metadata
+    override getPersistentMapMetadata(): Promise<Dyson360PersistentMapMetadataResponseV1> | undefined {
+        return this.api?.getPersistentMapMetadata360V1();
+    }
+
     // Retrieve details of a completed clean
     override async getCompletedClean(cleanId: string): Promise<Dyson360CleanSummaryResult> {
         if (!this.api) return 'Unavailable';
 
         // Retrieve details of the specified (or most recent) clean
-        const history = await this.api.getCleanMaps360();
+        const history = await this.api.getCleanMaps360V1();
         const clean = history.find(entry => entry.cleanId === cleanId);
         if (!clean)                             return 'Not found';
         const interim = clean.cleanTimeline.at(-1)?.eventName !== Dyson360TimelineEvent.RunEnded;
         if (interim)                            return 'Not ready';
-        let persistentMap: Dyson360PersistentMapResponse | undefined;
-        if (clean.persistentMap) persistentMap = await this.api.getPersistentMap360(clean.persistentMap.id);
+        let persistentMap: Dyson360PersistentMapResponseV1 | undefined;
+        if (clean.persistentMap) persistentMap = await this.api.getPersistentMap360V1(clean.persistentMap.id);
 
         // Render the map for the log; the area and charges come with it, so
         // it is rendered even when the map itself is not logged

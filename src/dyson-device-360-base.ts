@@ -25,23 +25,25 @@ import { PLUGIN_URL, VENDOR_ID, VENDOR_NAME } from './settings.js';
 import { RvcCleanMode360, RvcRunMode360 } from './matter-360-modes.js';
 import { PowerSource, RvcOperationalState } from './matter-clusters.js';
 import {
-    Dyson360CleaningStrategy,
+    Dyson360VacuumMode,
     Dyson360PowerMode,
     Dyson360State
 } from './dyson-360-types.js';
 import {
-    Dyson360MappedFaults,
-    mapDyson360Faults
+    Dyson360FaultMapper,
+    Dyson360MappedFaults
 } from './dyson-device-360-faults.js';
 import { assert } from 'console';
 import {
-    Device360Command,
-    Device360CommandHandlers
+    DysonDevice360Command,
+    DysonDevice360CommandHandlers
 } from './dyson-device-360-commands.js';
 import { MaybePromise } from './utils.js';
 import { VendorId } from './matter-clusters.js';
 import { setTimeout } from 'node:timers/promises';
 import { CleanRecordRaw, makeCleanRecordId, saveCleanRecord } from './dyson-clean-history.js';
+import { DysonMsgAny } from './dyson-mqtt-parse.js';
+import { TypeMap as DysonMsgMap360 } from './ti/dyson-360-msg-types.js';
 
 // Details of a completed clean
 export interface Dyson360CleanSummary {
@@ -70,7 +72,7 @@ export type Dyson360CleanSummaryResult = Dyson360CleanSummary | Dyson360CleanSum
 // ends while the robot is still away from its dock, and the cloud has the
 // clean only after it has driven back and uploaded it; that took 2½ minutes
 // from the far end of a flat, so the limit leaves room for a longer way home.
-const CLEAN_RETRY_AFTER     =       5 * MS; // 5 second minimum backoff
+const CLEAN_RETRY_MIN       =       5 * MS; // 5 second minimum backoff
 const CLEAN_RETRY_MAX       =  2 * 60 * MS; // At most 2 minutes between attempts
 const CLEAN_RETRY_LIMIT     = 30 * 60 * MS; // Give up after 30 minutes
 const CLEAN_RETRY_FACTOR    = 2;            // Double backoff on each failure
@@ -92,6 +94,7 @@ const STATE_MAP: Record<Dyson360State, StateMapColumns> = {
     [Dyson360State.FaultOnDock]:            ['Idle',        'Error',            true],
     [Dyson360State.FaultOnDockCharged]:     ['Idle',        'Error',            true],
     [Dyson360State.FaultOnDockCharging]:    ['Idle',        'Error',            true],
+    [Dyson360State.FaultPowerCycle]:        ['Idle',        'Error',            false],
     [Dyson360State.FaultReplaceOnDock]:     ['Idle',        'Error',            false],
     [Dyson360State.FaultReturnToDock]:      ['Idle',        'Error',            false],
     [Dyson360State.FaultRunningDiagnostic]: ['Idle',        'Error',            false],
@@ -118,7 +121,7 @@ const STATE_MAP: Record<Dyson360State, StateMapColumns> = {
     [Dyson360State.MappingRunning]:         ['Mapping',     'Running',          false],
     [Dyson360State.Aborted]:                ['Idle',        'SeekingCharger',   false]
 };
-function mapState(state: Dyson360State): {
+export function dyson360MapState(state: Dyson360State): {
     runMode:            RvcRunMode360,
     operationalState:   RvcOperationalState.OperationalState,
     isDocked:           boolean
@@ -132,7 +135,7 @@ function mapState(state: Dyson360State): {
 }
 
 // Mapping of robot power mode to its corresponding Matter Clean Mode and label
-export type Dyson360PowerLevel = Dyson360PowerMode | Dyson360CleaningStrategy;
+export type Dyson360PowerLevel = Dyson360PowerMode | Dyson360VacuumMode;
 export type Dyson360PowerLevelMap = [Dyson360PowerLevel, ...RvcCleanModeLabels[number]];
 
 // Thresholds for battery levels
@@ -141,15 +144,19 @@ const BATTERY_THRESHOLD_WARNING  = 25;
 const BATTERY_THRESHOLD_FULL     = 100;
 
 // A Dyson robot vacuum device
-export abstract class DysonDevice360Base
-    extends DysonDevice<DysonMqtt360> {
+export abstract class DysonDevice360Base<T extends DysonMqtt360 = DysonMqtt360>
+    extends DysonDevice<T> {
 
     // The MQTT client and status update listener
     static override readonly mqttConstructor = DysonMqtt360;
     mqttStatusListener:     () => void;
+    mqttMessageListener:    (msg: DysonMsgAny<DysonMsgMap360>) => void;
 
     // The RVC Matter accessory
     endpoint?:              Endpoint360;
+
+    // Fault code mapper
+    faultMapper:            Dyson360FaultMapper;
 
     // State used to detect the end of a clean
     runMode = RvcRunMode360.Idle;
@@ -165,12 +172,15 @@ export abstract class DysonDevice360Base
     get unreachableGrace(): number { return this.config.unreachableTimeout * MS; }
 
     // Construct a new Dyson device instance
-    constructor(...args: DysonDeviceConstructorParams<DysonMqtt360>) {
+    constructor(...args: DysonDeviceConstructorParams<T>) {
         super(...args);
 
+        // Prepare the fault code mapper
+        this.faultMapper = new Dyson360FaultMapper(this.log);
+
         // Prepare listeners for MQTT updates
-        this.mqttStatusListener = tryListener(this.mqtt, () =>
-            this.updateClusterAttributes(this.mqtt.status));
+        this.mqttStatusListener     = tryListener(this.mqtt, ()     => this.updateClusterAttributes(this.mqtt.status));
+        this.mqttMessageListener    = tryListener(this.mqtt, (msg)  => this.mqttMessageReceived(msg));
     }
 
     // Create the accessory for this device.
@@ -180,38 +190,8 @@ export abstract class DysonDevice360Base
     // is published over HAP instead, as the switch, battery and problem sensor
     // that HomeKit can actually represent.
     makeAccessory(): Endpoint360 {
-        const rvcCleanModeLabels: RvcCleanModeLabels =
-            this.getPowerLevelMaps().map(([, mode, label]) => [mode, label]);
-
-        // Static configuration of the RVC clusters
-        const endpointOptions: EndpointOptions360 = {
-            id:                     this.uniqueId,
-            deviceName:             this.deviceName,
-            basicInformation: {
-                nodeLabel:          this.deviceName,
-                partNumber:         this.modelNumber,
-                productAppearance:  this.getProductAppearance(),
-                productId:          this.productId,
-                productLabel:       this.modelNumber,
-                productName:        this.modelName,
-                productUrl:         PLUGIN_URL,
-                serialNumber:       this.serialNumber,
-                softwareVersion:    this.firmwareVersion,
-                uniqueId:           this.uniqueId,
-                vendorId:           VendorId(VENDOR_ID),
-                vendorName:         VENDOR_NAME
-            },
-            powerSource: {
-                batteryPartNumber:  this.getBatteryPartNumber()
-            },
-            rvcCleanMode: {
-                labels:             rvcCleanModeLabels,
-                simpleModeTags:     this.config.simpleModeTagsRvc
-            },
-            supportsMaps:           this.supportsMaps()
-        };
-
         // Create the accessory and attach a command handler
+        const endpointOptions = this.getEndpointOptions();
         const endpoint = this.hbApi.isMatterEnabled()
             ? new MatterAccessory360(this.log, this.config, this.hbApi, endpointOptions)
             : new HapAccessory360(this.log, this.config, this.hbApi, endpointOptions);
@@ -219,15 +199,45 @@ export abstract class DysonDevice360Base
         return endpoint;
     }
 
+    // Determine the supported endpoints and their options
+    getEndpointOptions(): EndpointOptions360 {
+        const rvcCleanModeLabels: RvcCleanModeLabels =
+            this.getPowerLevelMaps().map(([, mode, label]) => [mode, label]);
+        const endpointOptions: EndpointOptions360 = {
+            id:                             this.uniqueId,
+            deviceName:                     this.deviceName,
+            basicInformation: {
+                nodeLabel:                  this.deviceName,
+                partNumber:                 this.modelNumber,
+                productAppearance:          this.getProductAppearance(),
+                productId:                  this.productId,
+                productLabel:               this.modelNumber,
+                productName:                this.modelName,
+                productUrl:                 PLUGIN_URL,
+                serialNumber:               this.serialNumber,
+                softwareVersion:            this.firmwareVersion,
+                uniqueId:                   this.uniqueId,
+                vendorId:                   VendorId(VENDOR_ID),
+                vendorName:                 VENDOR_NAME
+            },
+            powerSource: {
+                batteryPartNumber:          this.getBatteryPartNumber()
+            },
+            rvcCleanMode: {
+                labels:                     rvcCleanModeLabels,
+                simpleModeTags:             this.config.simpleModeTagsRvc
+            },
+            supportsMaps:                   false
+        };
+        return endpointOptions;
+    }
+
     // Attach command handlers to the accessory
-    attachCommandHandlers(endpoint: Endpoint360): Device360CommandHandlers {
-        const handlers = new Device360CommandHandlers(this.log, this.mqtt, endpoint);
+    attachCommandHandlers(endpoint: Endpoint360): DysonDevice360CommandHandlers {
+        const handlers = new DysonDevice360CommandHandlers(this.log, this.mqtt, endpoint);
         handlers.attachCleanModeHandler(this.makePowerCommand.bind(this));
         return handlers;
     }
-
-    // Indicates whether the device supports Service Area map features
-    supportsMaps = (): boolean => false;
 
     // Retrieve the accessory representing this device
     override getAccessory(): Endpoint360 {
@@ -237,14 +247,7 @@ export abstract class DysonDevice360Base
     // Start the device after the accessory has been registered
     override async start(): Promise<void> {
         this.mqtt.on('status', this.mqttStatusListener);
-        this.mqtt.on('message', tryListener(this.mqtt, async msg => {
-            switch (msg.msg) {
-            case 'MAP-UPLOAD-STATUS':
-                // Spot+Scrub Ai doesn't provide cleanId in its normal status
-                await this.logCompletedClean(msg.cleanId, this.mqtt.status.cleanDuration);
-                break;
-            }
-        }));
+        this.mqtt.on('message', this.mqttMessageListener);
         await this.updateClusterAttributes(this.mqtt.status);
     }
 
@@ -253,6 +256,7 @@ export abstract class DysonDevice360Base
         clearTimeout(this.unreachableTimer);
         this.unreachableTimer = undefined;
         this.mqtt.off('status', this.mqttStatusListener);
+        this.mqtt.off('message', this.mqttMessageListener);
         await super.stop();
     }
 
@@ -261,11 +265,18 @@ export abstract class DysonDevice360Base
     abstract getProductAppearance(): BasicInformation.ProductAppearance;
     abstract getPowerLevelMaps(): Dyson360PowerLevelMap[];
     abstract setPowerLevel(powerLevel: Dyson360PowerLevel): Promise<void>;
-    abstract getPowerLevel(): Dyson360PowerLevel | undefined;
+    abstract getDefaultPowerLevel(): Dyson360PowerLevel | undefined;
+    abstract getCurrentPowerLevel(): Dyson360PowerLevel | undefined;
 
-    // The power level a clean is actually running at, for models that report one
-    // separately from their configured default. Undefined means not reported.
-    getCurrentPowerLevel(): Dyson360PowerLevel | undefined { return undefined; }
+    // Handle a received MQTT message
+    async mqttMessageReceived(msg: DysonMsgAny<DysonMsgMap360>): Promise<void> {
+        switch (msg.msg) {
+        case 'MAP-UPLOAD-STATUS':
+            // Spot+Scrub Ai doesn't provide cleanId in its normal status
+            if (msg.cleanId) await this.logCompletedClean(msg.cleanId, this.mqtt.status.cleanDuration);
+            break;
+        }
+    }
 
     // Retrieve details of a completed clean
     getCompletedClean(_cleanId: string): MaybePromise<Dyson360CleanSummaryResult> { return {}; }
@@ -273,7 +284,7 @@ export abstract class DysonDevice360Base
     // Retrieve details of a completed clean
     async getCompletedCleanWithRetries(cleanId: string): Promise<Dyson360CleanSummary> {
         const giveUpAt = Date.now() + CLEAN_RETRY_LIMIT;
-        let backoff = CLEAN_RETRY_AFTER;
+        let backoff = CLEAN_RETRY_MIN;
         for (;;) {
             const result = await this.getCompletedClean(cleanId);
             switch (result) {
@@ -341,39 +352,15 @@ export abstract class DysonDevice360Base
     }
 
     // Construct a command to set power level based on an RVC Clean Mode
-    makePowerCommand(cleanMode: RvcCleanMode360): Device360Command {
+    makePowerCommand(cleanMode: RvcCleanMode360): DysonDevice360Command {
         const map = this.getPowerLevelMaps().find(([, m]) => m === cleanMode);
         assertIsDefined(map);
         const powerLevel = map[0];
         return {
             description:    map[0],
             command:        () => this.setPowerLevel(powerLevel),
-            condition:      () => this.getPowerLevel() === powerLevel
+            condition:      () => this.getDefaultPowerLevel() === powerLevel
         };
-    }
-
-    // The power level to report in the RVC Clean Mode cluster.
-    //
-    // While cleaning, report what is actually running rather than the configured
-    // default: the Vis Nav lets a zone carry its own cleaning strategy, so a
-    // clean can run at a level the default never mentions, and reporting the
-    // default would have the accessory claim a mode the robot is not using.
-    // Outside a clean there is nothing running, so the default is what applies
-    // next, and it is also what a mode change writes.
-    reportedPowerLevel(status: DysonMqttStatus<DysonMqttStatus360>): Dyson360PowerLevel | undefined {
-        const { runMode } = mapState(status.state);
-        if (runMode !== RvcRunMode360.Idle) {
-            const current = this.getCurrentPowerLevel();
-            // Ignore a level the cluster does not advertise; it has no mode to map to
-            if (current !== undefined && this.getPowerLevelMaps().some(([level]) => level === current)) {
-                if (current !== this.getPowerLevel()) {
-                    this.log.debug(`Running at ${current}, which differs from the default`
-                                 + ` ${this.getPowerLevel() ?? 'unknown'}`);
-                }
-                return current;
-            }
-        }
-        return this.getPowerLevel();
     }
 
     // Map a Dyson power mode to its corresponding RVC Clean Mode
@@ -392,9 +379,9 @@ export abstract class DysonDevice360Base
         this.trackReachability(status.reachable);
 
         // Map the state to cluster attribute values
-        const faults = mapDyson360Faults(this.log, status.state, status.faults, status.activeFaults);
-        const cleanMode         = this.powerModeToCleanMode(this.reportedPowerLevel(status));
-        const { runMode }       = mapState(status.state);
+        const faults = await this.faultMapper.mapFault(status.state, status.faults, status.activeFaults);
+        const cleanMode         = this.mapCleanMode(status);
+        const { runMode }       = dyson360MapState(status.state);
         const operationalState  = this.mapOperationalState(status, faults);
         const batteryStatus     = this.mapBatteryStatus(status, faults);
 
@@ -452,11 +439,8 @@ export abstract class DysonDevice360Base
     }
 
     // Convert the battery status to Power Source cluster attributes
-    mapBatteryStatus(
-        status: DysonMqttStatus<DysonMqttStatus360>,
-        faults: Dyson360MappedFaults
-    ): UpdatePowerSource360 {
-        const { operationalState, isDocked } = mapState(status.state);
+    mapBatteryStatus(status: DysonMqttStatus<DysonMqttStatus360>, faults: Dyson360MappedFaults): UpdatePowerSource360 {
+        const { operationalState, isDocked } = dyson360MapState(status.state);
         const { batteryChargeLevel } = status;
         const { activeBatFaults, activeBatChargeFaults } = faults;
         if (!isDocked) activeBatChargeFaults.length = 0;
@@ -483,12 +467,34 @@ export abstract class DysonDevice360Base
         };
     }
 
+    // Convert the status to RVC Clean Mode.
+    //
+    // While cleaning, report what is actually running rather than the configured
+    // default: the Vis Nav lets a zone carry its own cleaning strategy, so a
+    // clean can run at a level the default never mentions, and reporting the
+    // default would have the accessory claim a mode the robot is not using.
+    // Outside a clean there is nothing running, so the default is what applies
+    // next, and it is also what a mode change writes. (Upstream reports the
+    // current level at all times.)
+    mapCleanMode(status: DysonMqttStatus<DysonMqttStatus360>): RvcCleanMode360 {
+        const { runMode } = dyson360MapState(status.state);
+        const defaultLevel = this.getDefaultPowerLevel();
+        if (runMode !== RvcRunMode360.Idle) {
+            const current = this.getCurrentPowerLevel();
+            // Ignore a level the cluster does not advertise; it has no mode to map to
+            if (current !== undefined && this.getPowerLevelMaps().some(([level]) => level === current)) {
+                if (current !== defaultLevel) {
+                    this.log.debug(`Running at ${current}, which differs from the default ${defaultLevel ?? 'unknown'}`);
+                }
+                return this.powerModeToCleanMode(current);
+            }
+        }
+        return this.powerModeToCleanMode(defaultLevel);
+    }
+
     // Convert the status to RVC Operational State cluster attributes
-    mapOperationalState(
-        status: DysonMqttStatus<DysonMqttStatus360>,
-        faults: Dyson360MappedFaults
-    ): UpdateRvcOperationalState360 {
-        const mappedState = mapState(status.state);
+    mapOperationalState(status: DysonMqttStatus<DysonMqttStatus360>, faults: Dyson360MappedFaults): UpdateRvcOperationalState360 {
+        const mappedState = dyson360MapState(status.state);
         const isActive = mappedState.runMode !== RvcRunMode360.Idle;
 
         // A device that stopped responding long ago tells us nothing about what
@@ -510,7 +516,7 @@ export abstract class DysonDevice360Base
 
         // Ensure consistent Operational State and Operational Error
         const { operationalError } = faults;
-        let { operationalState } = mapState(status.state);
+        let { operationalState } = mappedState;
         if (operationalError.errorStateId !== RvcOperationalState.ErrorState.NoError) {
             // Force Error state if an error is being reported
             operationalState = RvcOperationalState.OperationalState.Error;

@@ -8,9 +8,10 @@ import {
     Dyson360CleaningMode,
     Dyson360CleaningProgramme,
     Dyson360CleaningState,
-    Dyson360CleaningStrategy,
+    Dyson360VacuumMode,
     Dyson360CleaningType,
     Dyson360Consumable,
+    Dyson360DockAction,
     Dyson360DockCommissioningState,
     Dyson360DockState,
     Dyson360DoNotDisturbMode,
@@ -19,10 +20,15 @@ import {
     Dyson360GoodbyeReason,
     Dyson360MapUploadStatus,
     Dyson360OutOfBoxState,
-    Dyson360Position,
     Dyson360PowerMode,
     Dyson360State,
-    Dyson360ZoneStatus
+    Dyson360ZoneStatus,
+    Dyson360Coordinate,
+    Dyson360PointRobot,
+    Dyson360CleaningProgrammeSpot,
+    Dyson360CleaningProgrammeZones,
+    Dyson360CleaningProgrammeGlobal,
+    Dyson360VoiceDownloadStatus
 } from './dyson-360-types.js';
 import { DysonModeReason, DysonMsg } from './dyson-types.js';
 
@@ -49,7 +55,7 @@ export interface Dyson360MsgConnectionStatus extends DysonMsg {
 
 // (This is also sometimes received with an empty MQTT topic)
 export interface Dyson360MsgHello extends DysonMsg {
-    msg:                                'HELLO',
+    msg:                                'HELLO';
     model?:                             string; // e.g. 'RB03'
     productHardware?:                   string; // e.g. 'RB03-1'
     protocol:                           string; // e.g. '1.0.0'
@@ -80,28 +86,32 @@ export interface Dyson360MsgImBack extends DysonMsg {
     state?:                             Dyson360State;
 }
 
-export interface Dyson360MsgCurrentState extends DysonMsg {
+export interface Dyson360MsgCurrentStatePosition extends DysonMsg {
     msg:                                'CURRENT-STATE';
-    activeFaults?:                      Dyson360ActiveFault[],
-    airDryFrequency?:                   number; // e.g. 4
-    alarm?:                             boolean;
-    backWashFrequency?:                 number; // Minutes
-    backWashTime?:                      number; // e.g. 15
+    globalPosition:                     Dyson360PointRobot[];
+}
+export interface Dyson360MsgCurrentStateState extends DysonMsg {
+    msg:                                'CURRENT-STATE';
+    activeFaults?:                      Dyson360ActiveFault[];
+    airDryFrequency?:                   number; // hours
+    alarm?:                             boolean; // find-my-robot chime
+    backWashFrequency?:                 number; // minutes
+    backWashTime?:                      number; // minutes
     backWashType?:                      Dyson360BackWashType;
     batteryChargeLevel?:                number; // Percent remaining
     channel?:                           string; // Wi-Fi channel number
     childLock?:                         boolean;
-    cleanDuration?:                     number; // Seconds
+    cleanDuration?:                     number; // seconds
     cleanId?:                           string; // UUID
     cleaningProgramme?:                 Dyson360CleaningProgramme;
     cleaningState?:                     Dyson360CleaningState;
     collectDustOnSelfClean?:            boolean;
     consumables?:                       Dyson360Consumable[];
     currentCleaningMode?:               Dyson360CleaningMode;
-    currentCleaningStrategy?:           Dyson360CleaningStrategy,
+    currentCleaningStrategy?:           Dyson360VacuumMode;
     currentVacuumPowerMode?:            Dyson360PowerMode;
     defaultCleaningMode?:               Dyson360CleaningMode;
-    defaultCleaningStrategy?:           Dyson360CleaningStrategy,
+    defaultCleaningStrategy?:           Dyson360VacuumMode;
     defaultVacuumPowerMode?:            Dyson360PowerMode;
     detergent?:                         boolean;
     dockCommissioningState?:            Dyson360DockCommissioningState;
@@ -111,7 +121,7 @@ export interface Dyson360MsgCurrentState extends DysonMsg {
     faults?:                            Dyson360Faults;
     fullCleanAction?:                   Dyson360FullCleanAction;
     fullCleanType?:                     Dyson360CleaningType;
-    globalPosition?:                    Dyson360Position;
+    globalPosition?:                    Dyson360Coordinate;
     hotWaterMop?:                       boolean;
     hotWaterSwitch?:                    boolean;
     initialDockCommissioningCompleted?: boolean;
@@ -119,39 +129,41 @@ export interface Dyson360MsgCurrentState extends DysonMsg {
     persistentMapId?:                   string; // UUID
     rssi?:                              string; // Wi-Fi RSSI dBm
     sessionId?:                         string; // UUID
-    state?:                             Dyson360State;
+    state:                              Dyson360State;
     traverseTargetId?:                  string; // e.g. '1'
     voiceLanguage?:                     string; // e.g. 'jp-JP'
-    volume?:                            number;
+    volume?:                            number; // %
     washMopBeforeClean?:                boolean;
     zoneId?:                            string; // e.g. '1'
     zonesDefinitionVersion?:            string; // e.g. '2024-09-17T23:08:23.9939605Z'
     zoneStatus?:                        Dyson360ZoneStatus[];
 }
+export type Dyson360MsgCurrentState =
+    Dyson360MsgCurrentStatePosition | Dyson360MsgCurrentStateState
 
 export interface Dyson360MsgStateChange extends DysonMsg {
     msg:                                'STATE-CHANGE';
-    activeFaults?:                      Dyson360ActiveFault[],
+    activeFaults?:                      Dyson360ActiveFault[];
     batteryChargeLevel?:                number; // Percent remaining
     channel?:                           string; // Wi-Fi channel number
-    cleanDuration?:                     number; // Seconds
+    cleanDuration?:                     number; // seconds
     cleanId?:                           string; // UUID
     cleaningProgramme?:                 Dyson360CleaningProgramme;
     currentCleaningMode?:               Dyson360CleaningMode;
-    currentCleaningStrategy?:           Dyson360CleaningStrategy,
+    currentCleaningStrategy?:           Dyson360VacuumMode;
     currentVacuumPowerMode?:            Dyson360PowerMode;
     defaultCleaningMode?:               Dyson360CleaningMode;
-    defaultCleaningStrategy?:           Dyson360CleaningStrategy,
+    defaultCleaningStrategy?:           Dyson360VacuumMode;
     defaultVacuumPowerMode?:            Dyson360PowerMode;
     endOfClean?:                        boolean;
     faults?:                            Dyson360Faults;
     fullCleanType?:                     Dyson360CleaningType;
-    globalPosition?:                    Dyson360Position;
-    newActiveFaults?:                   Dyson360ActiveFault[],
+    globalPosition?:                    Dyson360Coordinate;
+    newActiveFaults?:                   Dyson360ActiveFault[];
     newOutOfBoxState?:                  Dyson360OutOfBoxState;
     newstate:                           Dyson360State;
     newZoneId?:                         string; // e.g. '1'
-    oldActiveFaults?:                   Dyson360ActiveFault[],
+    oldActiveFaults?:                   Dyson360ActiveFault[];
     oldOutOfBoxState?:                  Dyson360OutOfBoxState;
     oldstate:                           Dyson360State;
     oldZoneId?:                         string; // e.g. '1'
@@ -161,6 +173,19 @@ export interface Dyson360MsgStateChange extends DysonMsg {
     traverseTargetId?:                  string; // e.g. '1'
     zonesDefinitionVersion?:            string; // e.g. '2024-09-17T23:08:23.9939605Z'
     zoneStatus?:                        Dyson360ZoneStatus[];
+}
+
+export interface Dyson360MsgMapUploadStatus extends DysonMsg {
+    msg:                                'MAP-UPLOAD-STATUS';
+    cleanId?:                           string; // UUID
+    persistentMapId?:                   string; // UUID
+    status:                             Dyson360MapUploadStatus;
+}
+
+export interface Dyson360MsgCleanMapImageStatus extends DysonMsg {
+    msg:                                'CLEAN-MAP-IMAGE-STATUS'
+    cleanId?:                           string; // UUID
+    status:                             Dyson360MapUploadStatus;
 }
 
 export interface Dyson360MsgMapData extends DysonMsg {
@@ -175,7 +200,7 @@ export interface Dyson360MsgMapData extends DysonMsg {
 }
 
 export interface Dyson360MsgMapGlobal extends DysonMsg {
-    msg:                                'MAP-GLOBAL',
+    msg:                                'MAP-GLOBAL';
     angle:                              number;
     cleanId:                            string; // UUID
     gridID:                             string; // e.g. '3'
@@ -184,8 +209,8 @@ export interface Dyson360MsgMapGlobal extends DysonMsg {
 }
 
 export interface Dyson360MsgMapGrid extends DysonMsg {
-    msg:                                'MAP-GRID',
-    anchor:                             Dyson360Position;
+    msg:                                'MAP-GRID';
+    anchor:                             Dyson360Coordinate;
     cleanId:                            string; // UUID
     gridID:                             string; // e.g. '3'
     height:                             number;
@@ -194,12 +219,19 @@ export interface Dyson360MsgMapGrid extends DysonMsg {
 }
 
 export interface Dyson360MsgTelemetryData extends DysonMsg {
-    msg:                                'TELEMETRY-DATA',
+    msg:                                'TELEMETRY-DATA';
     field1:                             string; // e.g. '128.0.0'
     field2:                             string; // e.g. '0.000000'
     field3:                             string; // e.g. ''
     field4:                             string; // e.g. UUID
     id:                                 string; // e.g. '41280000'
+}
+
+export interface Dyson360MsgVoiceDownloadStatus extends DysonMsg {
+    msg:                                'VOICE-DOWNLOAD-STATUS';
+    state:                              Dyson360VoiceDownloadStatus;
+    language:                           string; // e.g. 'en-GB'
+    progress?:                          number; // %
 }
 
 // MQTT topic: <type>/<sn>/command
@@ -216,24 +248,40 @@ export interface Dyson360MsgStateSet extends DysonMsg {
         defaultVacuumPowerMode: Dyson360PowerMode;
     }
     defaults?: {
-        defaultCleaningStrategy: Dyson360CleaningStrategy
+        defaultCleaningStrategy: Dyson360VacuumMode
     }
 }
 
-export interface Dyson360MsgStart extends DysonMsg {
+export interface Dyson360MsgStartBase extends DysonMsg {
     msg:                                'START';
     'mode-reason'?:                     DysonModeReason;
-    fullCleanType:                      Dyson360CleaningType;
-    cleaningMode?:                      Dyson360CleaningMode;
-    cleaningProgramme?:                 Dyson360CleaningProgramme;
-    cleaningStrategy?:                  Dyson360CleaningStrategy;
-    vacuumPowerMode?:                   Dyson360PowerMode;
+    fullCleanType?:                     Dyson360CleaningType;
     cleanId?:                           string; // UUID
 }
+export interface Dyson360MsgStartGlobal extends Dyson360MsgStartBase {
+    cleaningMode?:                      Dyson360CleaningMode.Global;
+    cleaningStrategy?:                  Dyson360VacuumMode;
+    vacuumPowerMode?:                   Dyson360PowerMode;
+    cleaningProgramme?:                 Dyson360CleaningProgrammeGlobal;
+}
+export interface Dyson360MsgStartZones extends Dyson360MsgStartBase {
+    cleaningMode:                       Dyson360CleaningMode.Zones;
+    cleaningProgramme:                  Dyson360CleaningProgrammeZones;
+}
+export interface Dyson360MsgStartSpot extends Dyson360MsgStartBase {
+    cleaningMode:                       Dyson360CleaningMode.Spot;
+    cleaningProgramme:                  Dyson360CleaningProgrammeSpot;
+}
+export type Dyson360MsgStart =
+    Dyson360MsgStartBase
+  | Dyson360MsgStartGlobal
+  | Dyson360MsgStartZones
+  | Dyson360MsgStartSpot;
 
 export interface Dyson360MsgPause extends DysonMsg {
     msg:                                'PAUSE';
     'mode-reason':                      DysonModeReason;
+    cleaningMode?:                      Dyson360CleaningMode;
 }
 
 export interface Dyson360MsgResume extends DysonMsg {
@@ -244,11 +292,26 @@ export interface Dyson360MsgResume extends DysonMsg {
 export interface Dyson360MsgAbort extends DysonMsg {
     msg:                                'ABORT'; // GoHome
     'mode-reason':                      DysonModeReason;
+    cleaningMode?:                      Dyson360CleaningMode;
+    state?:                             Dyson360State;
+}
+
+export interface Dyson360MsgAbortDockAction extends DysonMsg {
+    msg:                                'ABORT-DOCK-ACTION';
+    'mode-reason':                      DysonModeReason;
+    action:                             Dyson360DockAction;
+    delay?:                             number;
 }
 
 export interface Dyson360MsgSkipCurrentZone extends DysonMsg {
     msg:                                'SKIP-CURRENT-ZONE';
     'mode-reason':                      DysonModeReason;
+}
+
+export interface Dyson360MsgStartDockAction extends DysonMsg {
+    msg:                                'START-DOCK-ACTION';
+    'mode-reason':                      DysonModeReason;
+    action:                             Dyson360DockAction;
 }
 
 export interface Dyson360MsgStartMapping extends DysonMsg {
@@ -260,14 +323,19 @@ export interface Dyson360MsgPersistentMapManifestUpdated extends DysonMsg {
     msg:                                'PERSISTENT-MAP-MANIFEST-UPDATED'
 }
 
-export interface Dyson360MsgMapUploadStatus extends DysonMsg {
-    msg:                                'MAP-UPLOAD-STATUS';
-    cleanId:                            string; // UUID
-    status:                             Dyson360MapUploadStatus;
+export interface Dyson360MsgAcknowledgeFault extends DysonMsg {
+    msg:                                'ACKNOWLEDGE-FAULT';
+    'mode-reason':                      DysonModeReason;
+    faultCode:                          string; // e.g. '19.12.-1'
 }
 
-export interface Dyson360MsgAcknowledgeFault extends DysonMsg {
-    msg:                                'ACKNOWLEDGE-FAULT',
-    'mode-reason':                      DysonModeReason,
-    faultCode:                          string; // e.g. '19.12.-1'
+export interface Dyson360MsgSetVoiceLanguage extends DysonMsg {
+    msg:                                'SET-VOICE-LANGUAGE';
+    'mode-reason':                      DysonModeReason;
+    language:                           string; // e.g. 'en-GB'
+}
+
+export interface Dyson360MsgRequestVoiceDownloadStatus extends DysonMsg {
+    msg:                                'REQUEST-VOICE-DOWNLOAD-STATUS';
+    'mode-reason':                      DysonModeReason;
 }

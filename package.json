@@ -52,6 +52,7 @@
     },
     "dependencies": {
         "@homebridge/plugin-ui-utils": "^2.2.6",
+        "cbor2": "^2.4.0",
         "mqtt": "^5.15.2",
         "node-persist": "^4.0.4",
         "pngjs": "^7.0.0",

@@ -10,12 +10,10 @@ import {
     DysonAccountLogin
 } from './config-types.js';
 import {
-    DysonAccountStatus,
-    DysonIoTCredentialsResponse
+    DysonIoTCredentialsResponseV2
 } from './dyson-cloud-types.js';
 import NodePersist from 'node-persist';
 import { DysonCloudAPI } from './dyson-cloud-api.js';
-import { DEFAULT_COUNTRY } from './settings.js';
 import { assertIsDefined, columns, formatMilliseconds, MS, plural } from './utils.js';
 import { isSupportedModel } from './dyson-device.js';
 import { DeviceConfigMqtt, DeviceConfigRemoteMqtt } from './dyson-mqtt-client-live.js';
@@ -24,9 +22,13 @@ import { setTimeout } from 'node:timers/promises';
 import { logError } from './log-error.js';
 import { PrefixLogger } from './logger-prefix.js';
 import { DysonCloudAPIDevice } from './dyson-cloud-api-device.js';
+import { DysonAccountStatus } from './dyson-types.js';
 
 // Devices accessed via IoT MQTT can also use the Dyson cloud API
-type WithAPI<T> = T & { api?: DysonCloudAPIDevice; };
+type WithAPI<T> = T & {
+    api?:           DysonCloudAPIDevice;
+    variant?:       string; // Product variant, if known
+};
 export type DeviceConfigMqttWithApi = WithAPI<DeviceConfigMqtt>;
 
 // Persistent storage for an account
@@ -46,7 +48,7 @@ type PersistKey = keyof PersistData;
 
 // Cache of recently issued AWS IoT credentials
 interface IoTCredentialsData {
-    credentials:    DysonIoTCredentialsResponse;
+    credentials:    DysonIoTCredentialsResponseV2;
     created:        number;
 }
 
@@ -73,12 +75,14 @@ export class DysonCloud<T extends Config = Config> {
 
     // Create a Dyson API client, with Bearer token if available
     async createApi(): Promise<DysonCloudAPI> {
-        let country = DEFAULT_COUNTRY;
+        let china = false;
         let token: string | undefined;
 
         // Attempt to use the configuration to configure the API client
         if (this.account) {
-            country = this.account.country;
+            // Mainland China has its own API host; the country and locale
+            // that per-device endpoints ask for come from each device's market
+            china = this.account.country.toUpperCase() === 'CN';
             if ('token' in this.account) {
                 // Configuration provides the Bearer token explicitly
                 token = this.account.token;
@@ -99,10 +103,10 @@ export class DysonCloud<T extends Config = Config> {
         }
 
         // Create the API client
-        const api = new DysonCloudAPI(this.log, this.config, country, token);
+        const api = new DysonCloudAPI(this.log, this.config, china, token);
 
         // Perform a dummy version read before using the API for anything else
-        await api.getVersion();
+        await api.getVersionV1();
         return api;
     }
 
@@ -145,7 +149,7 @@ export class DysonCloudAuth extends DysonCloud {
 
         // Check that the email address is registered
         this.log.debug(`Checking email address: ${email}`);
-        const userStatus = await api.getUserStatus(email);
+        const userStatus = await api.getUserStatusV3(email);
         if (userStatus.accountStatus !== DysonAccountStatus.Active) {
             throw new Error(`User account ${email} is not active`);
         }
@@ -153,7 +157,7 @@ export class DysonCloudAuth extends DysonCloud {
         try {
             // Start authorisation
             this.log.debug(`Starting authorisation for ${email}`);
-            const challengeId = await api.startAuthorisation(email);
+            const challengeId = await api.startAuthorisationV3(email);
 
             // Authorisation started, so save the challenge ID
             this.log.info(`Account authorisation started: ${challengeId}`);
@@ -198,7 +202,7 @@ export class DysonCloudAuth extends DysonCloud {
         // Attempt to complete authorisation
         const { challengeId } = challenge;
         this.log.debug(`Completing authorisation for ${email}: ${challengeId}`);
-        const authorised = await api.completeAuthorisation(challengeId, email, otpCode, password);
+        const authorised = await api.completeAuthorisationV3(challengeId, email, otpCode, password);
 
         // Authorisation complete, so store the token
         const { token } = authorised;
@@ -227,7 +231,7 @@ export class DysonCloudRemote extends DysonCloud<ConfigRemoteAccount> {
     async getDevices(): Promise<WithAPI<DeviceConfigRemoteMqtt>[]> {
         // Retrieve a list of devices associated with the account
         const api = await this.api;
-        const manifest = await api.getManifest();
+        const manifest = await api.getManifestV3();
 
         // Extract details of the devices supported by this plugin
         const rows: string[][] = [['Serial Number', 'Name', 'MQTT', 'Model', 'Product Name', 'Firmware', 'Status']];
@@ -237,6 +241,7 @@ export class DysonCloudRemote extends DysonCloud<ConfigRemoteAccount> {
             const rootTopic = device.connectedConfiguration?.mqtt.mqttRootTopicLevel;
             const firmware = connectedConfiguration?.firmware.version;
             const name = device.name ?? productName;
+            const variant = device.variant ?? undefined;
             const deviceLog = new PrefixLogger(this.log, name);
             let status: string;
             if (rootTopic && isSupportedModel(rootTopic)) {
@@ -244,7 +249,7 @@ export class DysonCloudRemote extends DysonCloud<ConfigRemoteAccount> {
                 status = 'Supported';
                 const deviceApi = api.createDeviceClient(deviceLog, device);
                 const getCredentials = async () => this.getIoT(deviceApi);
-                deviceConfigs.push({ name, serialNumber, rootTopic, getCredentials, api: deviceApi });
+                deviceConfigs.push({ name, serialNumber, rootTopic, variant, getCredentials, api: deviceApi });
             } else status = '(unsupported)';
             rows.push([serialNumber, `"${name}"`, rootTopic ?? type, model, productName, firmware ?? '?', status]);
         }
@@ -257,14 +262,14 @@ export class DysonCloudRemote extends DysonCloud<ConfigRemoteAccount> {
     }
 
     // Retrieve the AWS IoT credentials for a single device
-    async getIoT(api: DysonCloudAPIDevice): Promise<DysonIoTCredentialsResponse> {
+    async getIoT(api: DysonCloudAPIDevice): Promise<DysonIoTCredentialsResponseV2> {
         const { log, serialNumber } = api;
         let backoff = BACKOFF_MIN;
         for (let count = 1;; ++count) {
             try {
                 // Try to retrieve the credentials, caching the result
                 log.info(`Retrieving AWS IoT credentials (attempt #${count})`);
-                const credentials = await api.getIoTCredentials();
+                const credentials = await api.getIoTCredentialsV2();
                 this.cache.set(serialNumber, { credentials, created: Date.now() });
                 return credentials;
             } catch (err) {

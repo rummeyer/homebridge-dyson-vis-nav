@@ -16,9 +16,10 @@ import { DysonDeviceCompatibility } from './dyson-device-compatibility.js';
 
 // Dyson model details
 export interface DysonDeviceModel {
-    type:   string; // MQTT username
-    number: string; // Model number
-    name:   string; // Model description
+    type:       string;     // MQTT root topic
+    number:     string;     // Model number(s)
+    name:       string;     // Model description
+    variants?:  string[];   // Distinguish between models sharing same MQTT topic
 }
 
 // Dyson device constructor parameters
@@ -30,15 +31,6 @@ export type DysonDeviceConstructorParams<MQTT extends DysonMqttLike = DysonMqttL
     mqtt:   MQTT,
     api?:   DysonCloudAPIDevice
 ];
-
-// Dyson device constructor type
-export interface DysonDeviceConstructor<
-    MQTT    extends DysonMqttLike       = DysonMqttLike,
-    Device  extends DysonDevice<MQTT>   = DysonDevice<MQTT>
-> {
-    new (...args: DysonDeviceConstructorParams<MQTT>): Device;
-    readonly mqttConstructor: Constructor<MQTT>;
-}
 
 // A Dyson robot vacuum or air treatment device
 export abstract class DysonDevice<MQTT extends DysonMqttLike = DysonMqttLike> {

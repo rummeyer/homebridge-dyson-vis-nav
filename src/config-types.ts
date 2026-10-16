@@ -13,9 +13,9 @@ export type ProvisioningMethod =
 
 // Dyson account configuration.
 //
-// The country selects the API host (mainland China has its own) and supplies
-// the country and culture that per-device endpoints ask for. It replaced a
-// plain "china" flag, which could only ever say which of two hosts to use.
+// The country selects the API host (mainland China has its own). It replaced a
+// plain "china" flag; the country and culture that per-device endpoints ask for
+// now come from each device's market in the MyDyson manifest instead.
 export interface DysonAccountBase {
     country:                string;
 }

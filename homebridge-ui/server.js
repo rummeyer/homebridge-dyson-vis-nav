@@ -81,7 +81,7 @@ class DysonUiServer extends HomebridgePluginUiServer {
         try {
             const account = { email, password: '', country: request.account.country ?? 'GB' };
             const api = new DysonCloudAuth(log, makeAuthConfig(), persist, account);
-            const devices = await (await api.api).getManifest();
+            const devices = await (await api.api).getManifestV3();
             return {
                 authorised: true,
                 created:    stored.created ?? null,

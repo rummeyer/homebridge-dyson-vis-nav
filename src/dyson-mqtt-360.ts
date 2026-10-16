@@ -12,21 +12,23 @@ import {
 import { tryListener } from './utils.js';
 import {
     Dyson360MsgCurrentState,
+    Dyson360MsgCurrentStateState,
     Dyson360MsgStateChange
 } from './dyson-360-msg-types.js';
 import {
     Dyson360CleaningMode,
-    Dyson360CleaningProgramme,
-    Dyson360CleaningStrategy,
+    Dyson360VacuumMode,
     Dyson360CleaningType,
-    Dyson360PowerMode
+    Dyson360PowerMode,
+    Dyson360CleaningProgrammeZones
 } from './dyson-360-types.js';
 import { DysonModeReason } from './dyson-types.js';
 import { DeviceConfigMqtt } from './dyson-mqtt-client-live.js';
 import NodePersist from 'node-persist';
+import { validateDysonMsgTypeSuite } from './dyson-mqtt-parse.js';
 
 // Configuration of a Dyson MQTT client for robot vacuums
-const DYSON_MQTT_CONFIG_360: DysonMqttConfig<DysonMsgMap360> = {
+export const DYSON_MQTT_CONFIG_360: DysonMqttConfig<DysonMsgMap360> = {
     topics: {
         command:    '@/@/command',
         subscribe: ['@/@/status'],
@@ -39,20 +41,29 @@ const DYSON_MQTT_CONFIG_360: DysonMqttConfig<DysonMsgMap360> = {
     }
 };
 
+// Ensure that the type names all match their message names
+validateDysonMsgTypeSuite(DYSON_MQTT_CONFIG_360.messages);
+
 // Dyson robot vacuum status
 export type DysonMqttStatus360 =
-    Omit<Dyson360MsgCurrentState, 'msg' | 'time'>
-    & Required<Pick<Dyson360MsgCurrentState, 'state'>>;
+    Omit<Dyson360MsgCurrentStateState, 'msg' | 'time'>
+    & Pick<Dyson360MsgCurrentStateState, 'state'>;
 
 // Dyson robot vacuum supported commands
 export type DysonMqtt360Action = 'START' | 'PAUSE' | 'RESUME' | 'ABORT';
 
 // Dyson MQTT client for robot vacuums
-export class DysonMqtt360 extends DysonMqtt<DysonMsgMap360, DysonMqttStatus360> {
+export class DysonMqtt360<E extends unknown[] = []> extends DysonMqtt<DysonMsgMap360, DysonMqttStatus360, E> {
 
     // Construct a new MQTT client
-    constructor(log: AnsiLogger, config: Config, persist: NodePersist.LocalStorage, device: DeviceConfigMqtt) {
-        super(log, config, persist, device, DYSON_MQTT_CONFIG_360);
+    constructor(
+        log:        AnsiLogger,
+        config:     Config,
+        persist:    NodePersist.LocalStorage,
+        device:     DeviceConfigMqtt,
+        mqttConfig  = DYSON_MQTT_CONFIG_360
+    ) {
+        super(log, config, persist, device, mqttConfig);
 
         // Handle MQTT events
         this.on('subscribed', tryListener(this, async () =>
@@ -72,7 +83,7 @@ export class DysonMqtt360 extends DysonMqtt<DysonMsgMap360, DysonMqttStatus360> 
     }
 
     // Convert a STATE-CHANGE message to CURRENT-STATE format
-    convertStateChange(msg: Dyson360MsgStateChange): Dyson360MsgCurrentState {
+    convertStateChange(msg: Dyson360MsgStateChange): Dyson360MsgCurrentStateState {
         const {
             // Discard unmapped or replaced fields
             msg: _, endOfClean,
@@ -95,45 +106,53 @@ export class DysonMqtt360 extends DysonMqtt<DysonMsgMap360, DysonMqttStatus360> 
 
     // Update the robot vacuum state from a received message
     updateState(msg: Dyson360MsgCurrentState): void {
+        // Spot+Scrub Ai sends updates only providing globalPosition
+        const isFullUpdate = 'state' in msg;
+
         // Clear fields from the state that might have disappeared
         const DELETE_KEYS  = [
             'activeFaults',         'cleanDuration',            'cleanId',
             'cleaningProgramme',    'faults',                   'globalPosition',
             'persistentMapId',      'sessionId',                'traverseTargetId',
             'zoneId',               'zonesDefinitionVersion',   'zoneStatus'
-        ] as const satisfies (keyof Dyson360MsgCurrentState)[];
-        for (const key of DELETE_KEYS) this.status[key] = undefined;
+        ] as const satisfies (keyof Dyson360MsgCurrentStateState)[];
+        if (isFullUpdate) {
+            for (const key of DELETE_KEYS) this.status[key] = undefined;
+        }
 
         // Copy status fields from the message to the state
         const { msg: _msg, time, ...status } = msg;
         Object.assign(this.status, status);
 
         // State is fully initialised after the first message with state field
-        if (msg.state !== undefined) this.updateInitialised();
+        if (isFullUpdate) {
+            this.updateInitialised();
+            this.emit('update');
+        }
     }
 
     // Publish a robot vacuum command to perform an action
     commandAction(msg: DysonMqtt360Action): Promise<void>;
-    commandAction(msg: 'START', cleaningProgramme?: Dyson360CleaningProgramme): Promise<void>;
-    commandAction(msg: DysonMqtt360Action, cleaningProgramme?: Dyson360CleaningProgramme): Promise<void> {
+    commandAction(msg: 'START', cleaningProgramme?: Dyson360CleaningProgrammeZones): Promise<void>;
+    commandAction(msg: DysonMqtt360Action, cleaningProgramme?: Dyson360CleaningProgrammeZones): Promise<void> {
         switch (msg) {
         case 'START':
             return this.publish('START', cleaningProgramme ? {
-                'mode-reason':      DysonModeReason.LocalApp,
+                'mode-reason':      DysonModeReason.RemoteApp,
                 fullCleanType:      Dyson360CleaningType.Immediate,
-                cleaningMode:       Dyson360CleaningMode.ZoneConfigured,
+                cleaningMode:       Dyson360CleaningMode.Zones,
                 cleaningProgramme
-            } : {
-                'mode-reason':      DysonModeReason.LocalApp,
+            }: {
+                'mode-reason':      DysonModeReason.RemoteApp,
                 fullCleanType:      Dyson360CleaningType.Immediate,
                 cleaningMode:       this.status.defaultCleaningMode     && Dyson360CleaningMode.Global,
-                cleaningStrategy:   this.status.defaultCleaningStrategy && Dyson360CleaningStrategy.Auto
+                cleaningStrategy:   this.status.defaultCleaningStrategy
             });
         case 'PAUSE':
         case 'RESUME':
         case 'ABORT':
             return this.publish(msg, {
-                'mode-reason':  DysonModeReason.LocalApp
+                'mode-reason':  DysonModeReason.RemoteApp
             });
         }
     }
@@ -141,15 +160,15 @@ export class DysonMqtt360 extends DysonMqtt<DysonMsgMap360, DysonMqttStatus360> 
     // Publish a robot vacuum command to set the default power level (360 Eye)
     commandSetPowerMode(defaultVacuumPowerMode: Dyson360PowerMode): Promise<void> {
         return this.publish('STATE-SET', {
-            'mode-reason':  DysonModeReason.LocalApp,
+            'mode-reason':  DysonModeReason.RemoteApp,
             data:           { defaultVacuumPowerMode }
         });
     }
 
     // Publish a robot vacuum command to set the default power level (360 Vis Nav)
-    commandSetCleaningStrategy(defaultCleaningStrategy: Dyson360CleaningStrategy): Promise<void> {
+    commandSetCleaningStrategy(defaultCleaningStrategy: Dyson360VacuumMode): Promise<void> {
         return this.publish('STATE-SET', {
-            'mode-reason':  DysonModeReason.LocalApp,
+            'mode-reason':  DysonModeReason.RemoteApp,
             defaults:       { defaultCleaningStrategy }
         });
     }

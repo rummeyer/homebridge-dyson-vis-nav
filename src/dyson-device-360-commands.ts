@@ -6,7 +6,7 @@ import { AnsiLogger } from './logger.js';
 import { DysonMqtt360, DysonMqtt360Action } from './dyson-mqtt-360.js';
 import { DysonAccessory360 as Endpoint360 } from './accessory-360.js';
 import { RvcCleanMode360, RvcRunMode360 } from './matter-360-modes.js';
-import { Dyson360CleaningProgramme, Dyson360State } from './dyson-360-types.js';
+import { Dyson360CleaningMode, Dyson360State } from './dyson-360-types.js';
 import { CN, CV, RI } from './logger-options.js';
 import { ChangeToModeError, RvcOperationalStateError, SelectAreaError } from './error-360.js';
 import { MS } from './utils.js';
@@ -28,20 +28,21 @@ const STATE_MAP: Record<Dyson360State, StateAction[]> = {
     [Dyson360State.FaultOnDock]:            ['abort',   'START',    'START',    undefined,  undefined,  undefined,  true        ],
     [Dyson360State.FaultOnDockCharged]:     ['abort',   'START',    'START',    undefined,  undefined,  undefined,  true        ],
     [Dyson360State.FaultOnDockCharging]:    ['abort',   'START',    'START',    undefined,  undefined,  undefined,  true        ],
+    [Dyson360State.FaultPowerCycle]:        ['abort',   'START',    'START',    undefined,  undefined,  undefined,  'ABORT'     ],
     [Dyson360State.FaultReplaceOnDock]:     ['abort',   'START',    'START',    undefined,  undefined,  undefined,  undefined   ],
     [Dyson360State.FaultReturnToDock]:      ['abort',   'START',    'START',    undefined,  undefined,  undefined,  undefined   ],
     [Dyson360State.FaultRunningDiagnostic]: ['abort',   'START',    'START',    undefined,  undefined,  undefined,  'ABORT'     ],
     [Dyson360State.FaultUserRecoverable]:   ['abort',   'START',    'START',    undefined,  undefined,  undefined,  'ABORT'     ],
     [Dyson360State.FullCleanAbandoned]:     [true,      'START',    undefined,  undefined,  undefined,  undefined,  true        ],
     [Dyson360State.FullCleanAborted]:       [true,      'START',    undefined,  undefined,  undefined,  undefined,  true        ],
-    [Dyson360State.FullCleanCharging]:      ['ABORT',   true,       undefined,  undefined,  'PAUSE',    undefined,  'ABORT'     ],
-    [Dyson360State.FullCleanDiscovering]:   ['ABORT',   true,       undefined,  undefined,  'PAUSE',    undefined,  'ABORT'     ],
+    [Dyson360State.FullCleanCharging]:      ['ABORT',   true,       true,       undefined,  'PAUSE',    undefined,  'ABORT'     ],
+    [Dyson360State.FullCleanDiscovering]:   ['ABORT',   true,       true,       undefined,  'PAUSE',    undefined,  'ABORT'     ],
     [Dyson360State.FullCleanFinished]:      [true,      'START',    undefined,  undefined,  undefined,  undefined,  true        ],
-    [Dyson360State.FullCleanInitiated]:     ['ABORT',   true,       undefined,  undefined,  'PAUSE',    undefined,  'ABORT'     ],
-    [Dyson360State.FullCleanNeedsCharge]:   ['ABORT',   true,       undefined,  undefined,  'PAUSE',    undefined,  'ABORT'     ],
-    [Dyson360State.FullCleanPaused]:        ['ABORT',   true,       undefined,  undefined,  undefined,  'RESUME',   'ABORT'     ],
-    [Dyson360State.FullCleanRunning]:       ['ABORT',   true,       undefined,  undefined,  'PAUSE',    undefined,  'ABORT'     ],
-    [Dyson360State.FullCleanTraversing]:    ['ABORT',   true,       undefined,  undefined,  'PAUSE',    undefined,  'ABORT'     ],
+    [Dyson360State.FullCleanInitiated]:     ['ABORT',   true,       true,       undefined,  'PAUSE',    undefined,  'ABORT'     ],
+    [Dyson360State.FullCleanNeedsCharge]:   ['ABORT',   true,       true,       undefined,  'PAUSE',    undefined,  'ABORT'     ],
+    [Dyson360State.FullCleanPaused]:        ['ABORT',   true,       true,       undefined,  undefined,  'RESUME',   'ABORT'     ],
+    [Dyson360State.FullCleanRunning]:       ['ABORT',   true,       true,       undefined,  'PAUSE',    undefined,  'ABORT'     ],
+    [Dyson360State.FullCleanTraversing]:    ['ABORT',   true,       true,       undefined,  'PAUSE',    undefined,  'ABORT'     ],
     [Dyson360State.InactiveCharged]:        [true,      'START',    'START',    undefined,  undefined,  undefined,  true        ],
     [Dyson360State.InactiveCharging]:       [true,      'START',    'START',    undefined,  undefined,  undefined,  true        ],
     [Dyson360State.InactiveDischarging]:    [true,      'START',    'START',    undefined,  undefined,  undefined,  'ABORT'     ],
@@ -60,17 +61,20 @@ type StateTarget = typeof STATE_COLUMNS[number];
 const UPDATE_TIMEOUT = 5 * MS; // 5 seconds
 
 // A command to issue
-export interface Device360Command {
+export interface DysonDevice360Command {
     description:    string;
     command:        () => Promise<void>;
     condition:      () => boolean;
 }
 
 // Attach command handlers to a Dyson robot vacuum device RVC endpoint
-export class Device360CommandHandlers {
+export class DysonDevice360CommandHandlers {
 
     // Abort previous operations that are still in progress
     abort?: AbortController;
+
+    // Optional mechanism to request rapid status polling
+    rapidPollRequest?: (duration: number) => void;
 
     // Create a new command handler
     constructor (
@@ -98,7 +102,7 @@ export class Device360CommandHandlers {
     }
 
     // Handle RVC Clean Mode cluster ChangeToMode commands
-    attachCleanModeHandler(makePowerCommand: (cleanMode: RvcCleanMode360) => Device360Command): void {
+    attachCleanModeHandler(makePowerCommand: (cleanMode: RvcCleanMode360) => DysonDevice360Command): void {
         this.endpoint.setCommandHandler360('ChangeCleanMode', async newMode => {
             const { description, command, condition } = makePowerCommand(newMode);
             this.log.info(`${CN}RVC Clean Mode${RI} ChangeToMode ${formatEnumLog(RvcCleanMode360, newMode)} → ${CV}${description}${RI}`);
@@ -108,7 +112,7 @@ export class Device360CommandHandlers {
 
     // Handle Service Area cluster SelectAreas commands
     attachSelectAreasHandler(
-        makeCleaningProgramme:  (areaIds: number[]) => Promise<Dyson360CleaningProgramme>,
+        makeCleaningProgramme:  (areaIds: number[]) => Promise<DysonDevice360Command>,
         makeAreaName:           (areaId: number) => string
     ): void {
         this.endpoint.setCommandHandler360('SelectAreas', async newAreas => {
@@ -119,25 +123,45 @@ export class Device360CommandHandlers {
                 }
             } else {
                 const areaNames = newAreas.map(areaId => makeAreaName(areaId));
-                const description = `${CN}ServiceArea${RI} ${CV}SelectAreas${RI} [${areaNames.join(', ')}]`;
+                const prefix = `${CN}ServiceArea${RI} ${CV}SelectAreas${RI} [${areaNames.join(', ')}]`;
 
                 // SelectWhileRunning is not supported
-                if (!this.targetAction('ZoneClean')) {
-                    this.log.info(`${description} → not allowed in current state`);
+                await this.waitForUpdateBeforeCommand();
+                if (this.targetAction('ZoneClean') !== 'START') {
+                    this.log.info(`${prefix} → not allowed in current state`);
                     throw new SelectAreaError.InvalidInMode();
                 }
 
                 // Publish a command to start the zone configured cleaning
-                this.log.info(`${description} → ${CV}ZoneClean${RI}`);
-                const cleaningProgramme = await makeCleaningProgramme(newAreas);
+                this.log.info(`${prefix} → ${CV}ZoneClean${RI}`);
+                const { description, command, condition } = await makeCleaningProgramme(newAreas);
                 await this.issueCommandAndWaitForUpdate(
-                    'perform action ZoneClean', () => this.mqtt.commandAction('START', cleaningProgramme), () => true);
+                    `perform action ${description}`,
+                    command,
+                    () => this.targetAction('Cleaning') === true && condition()
+                );
+
+                // Confirm that the robot is actually performing a zone clean
+                if (this.mqtt.status.currentCleaningMode !== Dyson360CleaningMode.Zones) {
+                    this.log.warn(`Zone clean started but robot reports a${this.mqtt.status.currentCleaningMode} clean`);
+                }
             }
         });
     }
 
+    // If status polled then wait for an update before processing a command
+    async waitForUpdateBeforeCommand(): Promise<void> {
+        if (!this.rapidPollRequest) return;
+        let updates = 0;
+        await this.issueCommandAndWaitForUpdate(
+            'poll for status update',
+            () => Promise.resolve(),
+            () => Boolean(updates++)
+        );
+    }
+
     // Perform a command and wait for a status update
-    async issueCommandAndWaitForUpdate (
+    async issueCommandAndWaitForUpdate(
         description:    string,
         command:        () => Promise<void>,
         condition:      () => boolean
@@ -147,13 +171,14 @@ export class Device360CommandHandlers {
             this.abort?.abort();
             this.abort = new AbortController();
             const signal = AbortSignal.any([this.abort.signal, AbortSignal.timeout(UPDATE_TIMEOUT)]);
+            this.rapidPollRequest?.(UPDATE_TIMEOUT);
 
             // Publish the command
             await command();
 
             // Wait for an update to satisfy the condition
             while (!condition()) {
-                await this.mqtt.onceAsync('status', signal);
+                await this.mqtt.onceAsync('update', signal);
             }
         } catch (cause) {
             // Identify the underlying error
@@ -180,6 +205,7 @@ export class Device360CommandHandlers {
     // Attempt to set a target state, returning false if not allowed
     async setTarget(description: string, target: StateTarget): Promise<boolean> {
         // Check whether the target is allowed or already satisfied
+        await this.waitForUpdateBeforeCommand();
         const action = this.targetAction(target);
         if (action === undefined) {
             this.log.info(`${description} → not allowed in current state`);
