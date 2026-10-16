@@ -27,9 +27,10 @@ the plugin; the reasoning behind each one is in the commit it came from.
 - **The Dyson protocol layer is updated to matterbridge-dyson-robot 1.12.3.**
   It brings more robust retries of failed MyDyson requests (including Cloudflare
   errors and rate limits) and new robot fault codes.
-- **Per-device MyDyson requests use the device's own market** for their country
-  and language. The country setting still chooses between the mainland China
-  and global servers.
+- **The country setting only chooses between the mainland China and global
+  MyDyson servers.** Upstream takes the country and language for per-device
+  requests from the market in the MyDyson manifest instead (a market of `EU`
+  becomes Ireland). None of the requests the Vis Nav makes uses them.
 
 ## [1.4.7] — 2026-10-05
 
