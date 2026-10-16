@@ -118,10 +118,12 @@ export class DysonDevice360VisNav extends DysonDevice360ZonesMixin(DysonDevice36
                 // No map or zone for global cleans
                 cleaningStatus = { cleaningMode };
             } else if (zoneStatus) {
-                // Live zone status available
+                // Live zone status available. Arriving back at the dock the
+                // robot drops its map before it leaves FULL_CLEAN_FINISHED;
+                // with no map the status cannot be placed, so the cached
+                // status from the clean is kept. (Upstream asserts the map.)
                 const { persistentMapId: mapId, zonesDefinitionVersion: mapVersion } = status;
-                assertIsDefined(mapId);
-                cleaningStatus = { cleaningMode, mapId, mapVersion, zoneStatus };
+                if (mapId) cleaningStatus = { cleaningMode, mapId, mapVersion, zoneStatus };
             } else if (cleaningProgramme && 'orderedZones' in cleaningProgramme) {
                 // No live zone status, so synthesise from cleaning programme
                 const zones = new Set([

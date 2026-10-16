@@ -19,6 +19,9 @@ the plugin; the reasoning behind each one is in the commit it came from.
 - **Room progress stays visible after a clean**. Finished rooms stay marked as
   completed, and rooms the clean never reached show as skipped, instead of the
   progress being cleared once the robot stopped.
+- **No error is logged as the robot docks after a room clean.** For one
+  message it reports the clean's room status without its map, which the
+  updated protocol layer treated as a fault.
 - **Rooms follow edits made in the MyDyson app** as soon as the robot reports
   its map changed, not only when the next zone clean is requested.
 

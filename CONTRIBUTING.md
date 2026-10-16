@@ -71,6 +71,10 @@ enumerated attribute as a plain `number`, so nothing more is needed.
 - **The account's country** only chooses the API host: `dyson-cloud.ts` turns it
   into upstream's `china` flag. The country and locale that per-device endpoints
   ask for come from each device's market in the manifest, as upstream does.
+- **A zone status without a map** is skipped in `DysonDevice360VisNav`'s
+  `updateClusterAttributes`, keeping the cached status from the clean. Docking
+  after a zone clean, the robot reports `FULL_CLEAN_FINISHED` with its zone
+  status but no `persistentMapId` for one message, which upstream asserts on.
 - **`override` modifiers** are added where upstream omits them, because this
   project compiles with `noImplicitOverride`. That alone makes
   `dyson-cloud-error.ts` diverge.
