@@ -11,6 +11,8 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+## [1.4.9] — 2026-10-16
+
 ### Changed
 
 - **The Dyson protocol layer is updated to matterbridge-dyson-robot 1.12.4**,
@@ -480,7 +482,8 @@ Verified end to end by replaying a recorded Vis Nav MQTT session: the accessory
 publishes as a standalone Matter node and all five clusters track the device
 through cleaning, docking, charging and fault states.
 
-[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.8...HEAD
+[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.9...HEAD
+[1.4.9]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.8...v1.4.9
 [1.4.8]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.7...v1.4.8
 [1.4.7]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.6...v1.4.7
 [1.4.6]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.5...v1.4.6
