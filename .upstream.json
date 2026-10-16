@@ -1,8 +1,8 @@
 {
     "repository": "https://github.com/thoukydides/matterbridge-dyson-robot.git",
     "baseline": {
-        "ref": "v1.12.3",
-        "commit": "0e7decbe97b2e7c6861003a47728bf1898a24b97"
+        "ref": "v1.12.4",
+        "commit": "5e00331d7b318e8111ab76a4e80dcf3e6b8f1530"
     },
     "comment": [
         "The Dyson protocol layer is carried over from matterbridge-dyson-robot",

@@ -11,6 +11,12 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+### Changed
+
+- **The Dyson protocol layer is updated to matterbridge-dyson-robot 1.12.4**,
+  which takes up this plugin's fix for a robot that drops its map while
+  docking after a room clean.
+
 ## [1.4.8] — 2026-10-16
 
 ### Fixed
