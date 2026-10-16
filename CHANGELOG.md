@@ -11,6 +11,8 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+## [1.4.8] — 2026-10-16
+
 ### Fixed
 
 - **Selecting no rooms starts a whole-home clean** instead of being rejected.
@@ -19,9 +21,6 @@ the plugin; the reasoning behind each one is in the commit it came from.
 - **Room progress stays visible after a clean**. Finished rooms stay marked as
   completed, and rooms the clean never reached show as skipped, instead of the
   progress being cleared once the robot stopped.
-- **No error is logged as the robot docks after a room clean.** For one
-  message it reports the clean's room status without its map, which the
-  updated protocol layer treated as a fault.
 - **Rooms follow edits made in the MyDyson app** as soon as the robot reports
   its map changed, not only when the next zone clean is requested.
 
@@ -475,7 +474,8 @@ Verified end to end by replaying a recorded Vis Nav MQTT session: the accessory
 publishes as a standalone Matter node and all five clusters track the device
 through cleaning, docking, charging and fault states.
 
-[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.7...HEAD
+[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.8...HEAD
+[1.4.8]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.7...v1.4.8
 [1.4.7]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.6...v1.4.7
 [1.4.6]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.5...v1.4.6
 [1.4.5]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.4...v1.4.5
