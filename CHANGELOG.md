@@ -11,6 +11,8 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+## [1.4.10] — 2026-10-18
+
 ### Security
 
 - **The MyDyson account token is no longer written to the log.** Completing
@@ -497,7 +499,8 @@ Verified end to end by replaying a recorded Vis Nav MQTT session: the accessory
 publishes as a standalone Matter node and all five clusters track the device
 through cleaning, docking, charging and fault states.
 
-[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.9...HEAD
+[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.10...HEAD
+[1.4.10]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.9...v1.4.10
 [1.4.9]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.8...v1.4.9
 [1.4.8]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.7...v1.4.8
 [1.4.7]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.6...v1.4.7
