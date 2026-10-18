@@ -86,14 +86,14 @@ export class DysonCloud<T extends Config = Config> {
             if ('token' in this.account) {
                 // Configuration provides the Bearer token explicitly
                 token = this.account.token;
-                this.log.debug(`Using configured MyDyson account token: ${token}`);
+                this.log.debug('Using the configured MyDyson account token');
             } else {
                 // Attempt to use the email and password to find a stored token
                 const persist = await this.getPersistent(this.account, 'token');
                 if (persist) {
                     token = persist.token;
                     const age = formatMilliseconds(Date.now() - persist.created);
-                    this.log.debug(`MyDyson account authorised ${age} ago: ${token}`);
+                    this.log.debug(`MyDyson account authorised ${age} ago`);
                 } else {
                     this.log.warn('MyDyson account requires authorisation');
                 }
@@ -206,7 +206,7 @@ export class DysonCloudAuth extends DysonCloud {
 
         // Authorisation complete, so store the token
         const { token } = authorised;
-        this.log.info(`Account authorisation complete: ${token}`);
+        this.log.info('Account authorisation complete');
         const persist: PersistTokenData = { token, created: Date.now() };
         await this.setPersistent(this.account, 'token', persist);
     }

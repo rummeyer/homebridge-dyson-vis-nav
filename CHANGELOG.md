@@ -11,6 +11,21 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+### Security
+
+- **The MyDyson account token is no longer written to the log.** Completing
+  the authorisation logged it at info level, and using a stored or
+  configured one at debug level; the lines now say what happened without it.
+- With **Log API Headers** or **Log API Bodies** turned on, the
+  `Authorization` header and every token, password, secret, credential and
+  signature in a body are shown as `<redacted>`. So is a response that does
+  not look as expected, which is logged at info level.
+
+### Fixed
+
+- A robot renamed in the settings now has its cached accessory renamed too
+  (`updateDisplayName`), as the Homebridge review of other plugins pointed out.
+
 ## [1.4.9] — 2026-10-16
 
 ### Changed

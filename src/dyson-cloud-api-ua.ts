@@ -5,7 +5,7 @@
 import { AnsiLogger, LogLevel } from './logger.js';
 import { Config } from './config-types.js';
 import { Client, Dispatcher } from 'undici';
-import { columns, getValidationTree, MS } from './utils.js';
+import { columns, getValidationTree, MS, REDACTED, redactBody, redactSecrets } from './utils.js';
 import { IncomingHttpHeaders } from 'undici/types/header.js';
 import { Checker, CheckerT, IErrorDetail } from 'ts-interface-checker';
 import { INSPECT_VERBOSE } from './logger-options.js';
@@ -228,9 +228,11 @@ export class DysonCloudAPIUserAgent {
         const rows: string[][] = [];
         Object.keys(headers).sort().forEach(key => {
             const values = headers[key];
-            if (typeof values === 'string') rows.push([`${key}:`, values]);
+            // The account token goes in a header, and is not for the log
+            const secret = /^(authorization|cookie|set-cookie)$/i.test(key);
+            if (typeof values === 'string') rows.push([`${key}:`, secret ? REDACTED : values]);
             else if (Array.isArray(values)) {
-                values.forEach(value => rows.push([`${key}:`, value]));
+                values.forEach(value => rows.push([`${key}:`, secret ? REDACTED : value]));
             }
         });
         this.log.debug(`${name} headers:`);
@@ -243,7 +245,7 @@ export class DysonCloudAPIUserAgent {
         if (typeof body !== 'string') return;
         if (body.length) {
             this.log.debug(`${name} body:`);
-            body.split('\n').forEach(line => { this.log.debug(`    ${line}`); });
+            redactBody(body).split('\n').forEach(line => { this.log.debug(`    ${line}`); });
         } else {
             this.log.debug(`${name} body: EMPTY`);
         }
@@ -256,7 +258,7 @@ export class DysonCloudAPIUserAgent {
             const validationLines = getValidationTree(errors);
             validationLines.forEach(line => { this.log.log(level, line); });
         }
-        const bodyLines = inspect(body, INSPECT_VERBOSE).split('\n');
+        const bodyLines = inspect(redactSecrets(body), INSPECT_VERBOSE).split('\n');
         bodyLines.forEach(line => { this.log.info(`    ${line}`); });
     }
 }

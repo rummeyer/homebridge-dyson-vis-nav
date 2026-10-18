@@ -170,6 +170,33 @@ export function tryListener<T extends unknown[]>(
     };
 }
 
+// Keys whose values are secrets, never to be written to the log
+const SECRET_KEY = /token|password|secret|credential|authori[sz]ation|signature|cookie/i;
+export const REDACTED = '<redacted>';
+
+// A copy of what the cloud sent or was sent, with every secret's value hidden,
+// for logging it: an account token or IoT credentials in the Homebridge log
+// would be shared with every log someone posts asking for help
+export function redactSecrets(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(redactSecrets);
+    if (value !== null && typeof value === 'object') {
+        return Object.fromEntries(Object.entries(value).map(([key, inner]) => [
+            key,
+            SECRET_KEY.test(key) && (inner === null || typeof inner !== 'object') ? REDACTED : redactSecrets(inner)
+        ]));
+    }
+    return value;
+}
+
+// A body as text for the log, with its secrets hidden if it is JSON
+export function redactBody(body: string): string {
+    try {
+        return JSON.stringify(redactSecrets(JSON.parse(body)), undefined, 2);
+    } catch {
+        return body;
+    }
+}
+
 // Convert a string enum to a string literal type
 type EnumToUnion<T> =
     T extends string ? `${T}`

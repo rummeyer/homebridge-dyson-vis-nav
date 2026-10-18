@@ -98,7 +98,9 @@ export class HapAccessory360 extends DysonAccessory360 {
         const restored = cached?.find(accessory => accessory.UUID === this.uuid);
         const accessory = restored
             ?? new this.api.platformAccessory(deviceName, this.uuid, CATEGORY_SWITCH);
-        accessory.displayName = deviceName;
+        // A name changed in the settings since: assigning displayName would
+        // not reach the cached accessory, updateDisplayName does
+        restored?.updateDisplayName(deviceName);
 
         // Describe the device itself
         const info = this.options.basicInformation;
