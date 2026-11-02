@@ -11,6 +11,8 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+## [1.4.11] — 2026-11-02
+
 ### Fixed
 
 - **A clean that lies turned on the map is turned back.** When the robot
@@ -508,7 +510,8 @@ Verified end to end by replaying a recorded Vis Nav MQTT session: the accessory
 publishes as a standalone Matter node and all five clusters track the device
 through cleaning, docking, charging and fault states.
 
-[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.10...HEAD
+[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.11...HEAD
+[1.4.11]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.10...v1.4.11
 [1.4.10]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.9...v1.4.10
 [1.4.9]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.8...v1.4.9
 [1.4.8]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.7...v1.4.8
