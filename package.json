@@ -81,13 +81,14 @@
         "build": "npm run build-checkers && npm run build-tsc && npm run check-layout && npm run check-ui-config && npm run check-ui-server",
         "clean": "rimraf ./src/ti ./dist",
         "prepare": "npm run build",
-        "lint": "eslint 'bin/**/*.ts' 'src/**/*.ts' --max-warnings=0",
-        "prepublishOnly": "npm run build && npm run lint",
+        "lint": "eslint 'bin/**/*.ts' 'src/**/*.ts' 'test/**/*.ts' --max-warnings=0",
+        "prepublishOnly": "npm run build && npm run lint && npm test",
         "check-layout": "tsx bin/check-plugin-layout.ts",
         "check-ui-server": "node bin/check-ui-server.mjs",
         "check-ui-config": "node bin/check-ui-auth-config.mjs",
         "upstream": "node bin/upstream-sync.mjs",
-        "check-session": "node bin/check-recorded-session.mjs"
+        "check-session": "node bin/check-recorded-session.mjs",
+        "test": "node --import tsx --test test/*.test.ts"
     },
     "files": [
         "dist/",

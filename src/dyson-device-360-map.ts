@@ -38,7 +38,7 @@ const RGBA_360_EYE = new Map<number, Dyson360EyeOctet>([
 ]);
 
 // Dyson 360 Vis Nav map pixels
-enum Dyson360VisNavCleanedOctet { Empty, Cleaned, Fault }
+export enum Dyson360VisNavCleanedOctet { Empty, Cleaned, Fault }
 const RGBA_VIS_NAV_CLEANED = new Map<number, Dyson360VisNavCleanedOctet>([
     [0x000000FF,    Dyson360VisNavCleanedOctet.Empty],          // Black
     [0xFFFFFFFF,    Dyson360VisNavCleanedOctet.Cleaned]         // White
@@ -225,7 +225,7 @@ function prepareMap360VisNav(
 }
 
 // How a clean is turned (degrees) and moved (pixels) about its middle
-interface CleanFit {
+export interface CleanFit {
     angle:  number;
     dx:     number;
     dy:     number;
@@ -245,7 +245,7 @@ const FIT_MIN_GAIN = 0.05;
 
 // The turn and move of a clean that puts most of its cleaned area within the
 // rooms, if that is clearly more than as placed; none if it is placed right
-function cleanMisalignment(
+export function cleanMisalignment(
     cleaned:        DysonBitmapOctet<Dyson360VisNavCleanedOctet>,
     zones:          DysonBitmapOctet,
     zonesOrigin:    { x: number, y: number }
@@ -296,7 +296,7 @@ function cleanMisalignment(
 
 // A bitmap turned and moved as fitted, with a margin all round for what is
 // turned beyond its edges (so its origin is -margin)
-function turnBitmap<Octet extends number>(bitmap: DysonBitmapOctet<Octet>, fit: CleanFit, margin: number): DysonBitmapOctet<Octet> {
+export function turnBitmap<Octet extends number>(bitmap: DysonBitmapOctet<Octet>, fit: CleanFit, margin: number): DysonBitmapOctet<Octet> {
     const width = bitmap.width + 2 * margin, height = bitmap.height + 2 * margin;
     const turned = new DysonBitmapOctet<Octet>(width, height, Buffer.alloc(width * height));
     // Each pixel from the one turned onto it, so that none is left out

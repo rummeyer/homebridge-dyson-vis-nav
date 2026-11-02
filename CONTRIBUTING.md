@@ -148,6 +148,7 @@ looks plausible after a sync.
 npm install
 npm run build     # checkers, tsc, then the three checks below
 npm run lint
+npm test          # unit tests in test/, run with Node's test runner through tsx
 ```
 
 `npm run build` runs three checks beyond the compiler. Each covers a part of a
@@ -279,7 +280,7 @@ each version, so this is not optional housekeeping.
 
 1. Bump `version` in `package.json`, and the two `version` fields in
    `package-lock.json` to match
-2. `npm run build && npm run lint`
+2. `npm run build && npm run lint && npm test`
 3. Commit, `git tag -a vX.Y.Z`, push both
 4. `npm pack`, then `gh release create vX.Y.Z <tarball> --title … --notes …`
 
