@@ -11,6 +11,15 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A clean that lies turned on the map is turned back.** When the robot
+  starts a clean with a wrong idea of which way it faces, the cloud still
+  places that clean on the map at 0°, so its cleaned area and dust lay turned
+  across the rooms. The map image and the log's map now turn and move such a
+  clean to where it fits the rooms best, if that fits clearly better; a
+  clean placed right is drawn as before.
+
 ## [1.4.10] — 2026-10-18
 
 ### Security

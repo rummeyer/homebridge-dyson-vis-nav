@@ -193,11 +193,27 @@ function prepareMap360VisNav(
     const dustDataDecoded = inflateSync(Buffer.from(dustData.data, 'base64'));
     const dustDataBitmap = new DysonBitmapOctet(dustWidth, dustHeight, dustDataDecoded);
 
+    // A clean the robot began with a wrong idea of which way it faced lies
+    // turned on the map, although the cloud places it at 0°; if so, turn the
+    // cleaned area and dust back to where they fit the rooms
+    let cleanedLayer: DysonBitmapOctet<Dyson360VisNavCleanedOctet> = cleanedBitmap;
+    let dustLayer: DysonBitmapOctet = dustDataBitmap;
+    let cleanOrigin: { x: number, y: number } | undefined;
+    const fit = zonesOrigin ? cleanMisalignment(cleanedBitmap, zonesBitmap, zonesOrigin) : undefined;
+    if (fit) {
+        log.debug(`Clean turned ${fit.angle}° and moved (${fit.dx}, ${fit.dy}) px to fit the rooms`);
+        const margin = Math.ceil(Math.hypot(cleanedBitmap.width, cleanedBitmap.height) * 2 * Math.sin(Math.abs(fit.angle) * Math.PI / 360)
+            + Math.max(Math.abs(fit.dx), Math.abs(fit.dy)));
+        cleanedLayer = turnBitmap(cleanedBitmap, fit, margin);
+        dustLayer = turnBitmap(dustDataBitmap, fit, margin);
+        cleanOrigin = { x: -margin, y: -margin };
+    }
+
     // Overlay the images, orientated to match the app
     const renderer = new DysonBitmapAnsi([
-        { bitmap: cleanedBitmap },
+        { bitmap: cleanedLayer, origin: cleanOrigin },
         { bitmap: presentationBitmap, origin: presentationOrigin },
-        { bitmap: dustDataBitmap },
+        { bitmap: dustLayer, origin: cleanOrigin },
         { bitmap: zonesBitmap, origin: zonesOrigin }
     ]);
     renderer.invertY = true;
@@ -206,6 +222,94 @@ function prepareMap360VisNav(
     // Dust level as a fraction of the maximum
     const dustScale = dustData.scaleFactor || 255;
     return { renderer, mmPerPixel, cleanedBitmap, dustScale };
+}
+
+// How a clean is turned (degrees) and moved (pixels) about its middle
+interface CleanFit {
+    angle:  number;
+    dx:     number;
+    dy:     number;
+    cx:     number;
+    cy:     number;
+}
+
+// Cleaned pixels sampled for fitting a clean to the rooms
+const FIT_SAMPLES = 3000;
+// How far a clean is searched for: turned up to this, moved up to this
+const FIT_MAX_ANGLE = 45;   // (degrees)
+const FIT_MAX_SHIFT = 48;   // (pixels)
+// The share of the cleaned area more within the rooms than as placed that a
+// turn has to bring to be believed: a clean placed right gains at most a
+// point or two from turning a little, one 13° off gained 13 points
+const FIT_MIN_GAIN = 0.05;
+
+// The turn and move of a clean that puts most of its cleaned area within the
+// rooms, if that is clearly more than as placed; none if it is placed right
+function cleanMisalignment(
+    cleaned:        DysonBitmapOctet<Dyson360VisNavCleanedOctet>,
+    zones:          DysonBitmapOctet,
+    zonesOrigin:    { x: number, y: number }
+): CleanFit | undefined {
+    const xs: number[] = [], ys: number[] = [];
+    for (let y = 0; y < cleaned.height; ++y) {
+        for (let x = 0; x < cleaned.width; ++x) {
+            if (cleaned.read(x, y) === Dyson360VisNavCleanedOctet.Cleaned) { xs.push(x); ys.push(y); }
+        }
+    }
+    if (xs.length < 100) return undefined;
+    const step = Math.max(1, Math.floor(xs.length / FIT_SAMPLES));
+    const px = xs.filter((_, i) => i % step === 0), py = ys.filter((_, i) => i % step === 0);
+    const cx = px.reduce((a, b) => a + b, 0) / px.length;
+    const cy = py.reduce((a, b) => a + b, 0) / py.length;
+
+    // The share of the sampled pixels within a room once turned and moved,
+    // of every `every`th of them
+    const within = (angle: number, dx: number, dy: number, every = 1): number => {
+        const cos = Math.cos(angle * Math.PI / 180), sin = Math.sin(angle * Math.PI / 180);
+        let count = 0;
+        for (let i = 0; i < px.length; i += every) {
+            const x = (px[i] ?? 0) - cx, y = (py[i] ?? 0) - cy;
+            const zx = Math.round(x * cos - y * sin + cx + dx - zonesOrigin.x);
+            const zy = Math.round(x * sin + y * cos + cy + dy - zonesOrigin.y);
+            if (0 <= zx && zx < zones.width && 0 <= zy && zy < zones.height && zones.read(zx, zy) !== 0) ++count;
+        }
+        return count / Math.ceil(px.length / every);
+    };
+
+    // Coarse on fewer pixels, then finer on all around the best
+    const search = (angles: number[], shifts: number[], around: CleanFit, every = 1): { score: number, fit: CleanFit } => {
+        let best = { score: -1, fit: around };
+        for (const da of angles) for (const sx of shifts) for (const sy of shifts) {
+            const fit = { ...around, angle: around.angle + da, dx: around.dx + sx, dy: around.dy + sy };
+            const score = within(fit.angle, fit.dx, fit.dy, every);
+            if (score > best.score) best = { score, fit };
+        }
+        return best;
+    };
+    const range = (max: number, by: number): number[] =>
+        Array.from({ length: 2 * Math.round(max / by) + 1 }, (_, i) => -max + i * by);
+    const placed = { angle: 0, dx: 0, dy: 0, cx, cy };
+    const coarse = search(range(FIT_MAX_ANGLE, 3), range(FIT_MAX_SHIFT, 8), placed, 4);
+    const fine = search(range(3, 0.5), range(8, 2), coarse.fit);
+    return fine.score - within(0, 0, 0) >= FIT_MIN_GAIN && fine.fit.angle !== 0 ? fine.fit : undefined;
+}
+
+// A bitmap turned and moved as fitted, with a margin all round for what is
+// turned beyond its edges (so its origin is -margin)
+function turnBitmap<Octet extends number>(bitmap: DysonBitmapOctet<Octet>, fit: CleanFit, margin: number): DysonBitmapOctet<Octet> {
+    const width = bitmap.width + 2 * margin, height = bitmap.height + 2 * margin;
+    const turned = new DysonBitmapOctet<Octet>(width, height, Buffer.alloc(width * height));
+    // Each pixel from the one turned onto it, so that none is left out
+    const cos = Math.cos(fit.angle * Math.PI / 180), sin = Math.sin(fit.angle * Math.PI / 180);
+    for (let y = 0; y < height; ++y) {
+        for (let x = 0; x < width; ++x) {
+            const tx = x - margin - fit.cx - fit.dx, ty = y - margin - fit.cy - fit.dy;
+            const sx = Math.round(tx * cos + ty * sin + fit.cx);
+            const sy = Math.round(-tx * sin + ty * cos + fit.cy);
+            if (0 <= sx && sx < bitmap.width && 0 <= sy && sy < bitmap.height) turned.write(x, y, bitmap.read(sx, sy));
+        }
+    }
+    return turned;
 }
 
 // Render a Dyson 360 Vis Nav cleaned area map
