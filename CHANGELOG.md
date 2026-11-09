@@ -11,6 +11,14 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A clean that lies moved on the map is moved back.** A clean the robot
+  started with a wrong idea of where it was lay up to 2.5 m off the rooms;
+  the map looked only 1 m around, and drew the clean of 9 November, 1.7 m
+  off, turned by 21° instead. It now looks further, and moves a clean
+  without turning it unless turning fits clearly better.
+
 ## [1.4.11] — 2026-11-02
 
 ### Fixed

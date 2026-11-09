@@ -72,6 +72,13 @@ void test('a clean turned the other way is found turned back the other way', () 
     assert.ok(Math.abs(fit.angle + 9) <= 1, `turned ${fit.angle}°`);
 });
 
+void test('a clean only moved, by more than a metre, is moved back and not turned', () => {
+    const fit = cleanMisalignment(cleaned(0, -70, 20), rooms(), { x: 0, y: 0 });
+    assert.ok(fit, 'no move found');
+    assert.equal(fit.angle, 0);
+    assert.ok(Math.abs(fit.dx - 70) <= 4 && Math.abs(fit.dy + 20) <= 4, `moved (${fit.dx}, ${fit.dy})`);
+});
+
 void test('a clean turned back lies within the rooms', () => {
     const clean = cleaned(-12, -10, 15);
     const room = rooms();

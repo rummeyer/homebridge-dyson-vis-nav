@@ -193,9 +193,10 @@ function prepareMap360VisNav(
     const dustDataDecoded = inflateSync(Buffer.from(dustData.data, 'base64'));
     const dustDataBitmap = new DysonBitmapOctet(dustWidth, dustHeight, dustDataDecoded);
 
-    // A clean the robot began with a wrong idea of which way it faced lies
-    // turned on the map, although the cloud places it at 0°; if so, turn the
-    // cleaned area and dust back to where they fit the rooms
+    // A clean the robot began with a wrong idea of where it was or which way
+    // it faced lies moved or turned on the map, although the cloud places it
+    // at 0°; if so, move and turn the cleaned area and dust back to where they
+    // fit the rooms
     let cleanedLayer: DysonBitmapOctet<Dyson360VisNavCleanedOctet> = cleanedBitmap;
     let dustLayer: DysonBitmapOctet = dustDataBitmap;
     let cleanOrigin: { x: number, y: number } | undefined;
@@ -235,13 +236,18 @@ export interface CleanFit {
 
 // Cleaned pixels sampled for fitting a clean to the rooms
 const FIT_SAMPLES = 3000;
-// How far a clean is searched for: turned up to this, moved up to this
+// How far a clean is searched for: turned up to this, moved up to this (the
+// clean of 9 November lay 1.7 m off and 4.5° turned)
 const FIT_MAX_ANGLE = 45;   // (degrees)
-const FIT_MAX_SHIFT = 48;   // (pixels)
+const FIT_MAX_SHIFT = 128;  // (pixels)
 // The share of the cleaned area more within the rooms than as placed that a
 // turn has to bring to be believed: a clean placed right gains at most a
 // point or two from turning a little, one 13° off gained 13 points
 const FIT_MIN_GAIN = 0.05;
+
+// A turn has to put this share more of the cleaned area within the rooms than
+// only moving it does: one only moved is not drawn turned a little as well
+const FIT_TURN_GAIN = 0.02;
 
 // The turn and move of a clean that puts most of its cleaned area within the
 // rooms, if that is clearly more than as placed; none if it is placed right
@@ -290,8 +296,11 @@ export function cleanMisalignment(
         Array.from({ length: 2 * Math.round(max / by) + 1 }, (_, i) => -max + i * by);
     const placed = { angle: 0, dx: 0, dy: 0, cx, cy };
     const coarse = search(range(FIT_MAX_ANGLE, 3), range(FIT_MAX_SHIFT, 8), placed, 4);
-    const fine = search(range(3, 0.5), range(8, 2), coarse.fit);
-    return fine.score - within(0, 0, 0) >= FIT_MIN_GAIN && fine.fit.angle !== 0 ? fine.fit : undefined;
+    const turned = search(range(3, 0.5), range(8, 2), coarse.fit);
+    const moved = search([0], range(8, 2), search([0], range(FIT_MAX_SHIFT, 8), placed, 4).fit);
+    const best = moved.score >= turned.score - FIT_TURN_GAIN ? moved : turned;
+    const { angle, dx, dy } = best.fit;
+    return best.score - within(0, 0, 0) >= FIT_MIN_GAIN && (angle !== 0 || dx !== 0 || dy !== 0) ? best.fit : undefined;
 }
 
 // A bitmap turned and moved as fitted, with a margin all round for what is
