@@ -11,6 +11,8 @@ the plugin; the reasoning behind each one is in the commit it came from.
 
 ## [Unreleased]
 
+## [1.4.12] — 2026-11-09
+
 ### Fixed
 
 - **A clean that lies moved on the map is moved back.** A clean the robot
@@ -518,7 +520,8 @@ Verified end to end by replaying a recorded Vis Nav MQTT session: the accessory
 publishes as a standalone Matter node and all five clusters track the device
 through cleaning, docking, charging and fault states.
 
-[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.11...HEAD
+[Unreleased]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.12...HEAD
+[1.4.12]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.11...v1.4.12
 [1.4.11]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.10...v1.4.11
 [1.4.10]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.9...v1.4.10
 [1.4.9]: https://github.com/rummeyer/homebridge-dyson-vis-nav/compare/v1.4.8...v1.4.9
